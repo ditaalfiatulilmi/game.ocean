@@ -1,0 +1,2724 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>OCEAN ADVENTURE – PETUALANGAN BAWAH LAUT</title>
+
+  <!-- Tailwind CSS untuk tata letak modern, responsif & ramah anak SD -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Google Fonts: Fredoka (judul ramah anak) & Nunito (teks soal sangat jelas) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet" />
+
+  <!-- MediaPipe Hands & Camera Utils CDN untuk deteksi telapak tangan -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+
+  <style>
+    :root {
+      --font-display: 'Fredoka', cursive, sans-serif;
+      --font-body: 'Nunito', sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: var(--font-body);
+      background: #0284c7;
+    }
+
+    .font-display {
+      font-family: var(--font-display);
+    }
+
+    /* Kanvas utama dunia bawah laut */
+    #oceanCanvas {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      display: block;
+      z-index: 1;
+      touch-action: none;
+    }
+
+    /* Tombol bergaya arcade 3D empuk */
+    .btn-arcade {
+      font-family: var(--font-display);
+      transition: transform 0.14s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.14s ease, filter 0.14s ease;
+      cursor: pointer;
+    }
+
+    .btn-arcade:hover:not(:disabled) {
+      transform: translateY(-2px) scale(1.02);
+      filter: brightness(1.05);
+    }
+
+    .btn-arcade:active:not(:disabled) {
+      transform: translateY(3px) scale(0.98);
+    }
+
+    .btn-ocean {
+      background: linear-gradient(180deg, #38bdf8 0%, #0284c7 100%);
+      box-shadow: 0 5px 0 #0369a1, 0 10px 20px rgba(2, 132, 199, 0.35);
+      border: 2px solid #bae6fd;
+    }
+
+    .btn-ocean:active:not(:disabled) {
+      box-shadow: 0 2px 0 #0369a1;
+    }
+
+    .btn-emerald {
+      background: linear-gradient(180deg, #34d399 0%, #059669 100%);
+      box-shadow: 0 5px 0 #047857, 0 10px 20px rgba(5, 150, 105, 0.35);
+      border: 2px solid #a7f3d0;
+    }
+
+    .btn-emerald:active:not(:disabled) {
+      box-shadow: 0 2px 0 #047857;
+    }
+
+    .btn-amber {
+      background: linear-gradient(180deg, #fbbf24 0%, #d97706 100%);
+      box-shadow: 0 5px 0 #b45309, 0 10px 20px rgba(217, 119, 6, 0.35);
+      border: 2px solid #fde68a;
+    }
+
+    .btn-amber:active:not(:disabled) {
+      box-shadow: 0 2px 0 #b45309;
+    }
+
+    .btn-purple {
+      background: linear-gradient(180deg, #c084fc 0%, #7c3aed 100%);
+      box-shadow: 0 5px 0 #5b21b6, 0 10px 20px rgba(124, 58, 237, 0.35);
+      border: 2px solid #e9d5ff;
+    }
+
+    .btn-purple:active:not(:disabled) {
+      box-shadow: 0 2px 0 #5b21b6;
+    }
+
+    /* Panel kaca cerah dengan efek kedalaman bawah laut */
+    .ocean-glass {
+      background: rgba(255, 255, 255, 0.93);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 3px solid rgba(255, 255, 255, 0.96);
+      box-shadow: 0 18px 42px rgba(7, 89, 133, 0.28);
+    }
+
+    @keyframes floatBob {
+      0%, 100% { transform: translateY(0px); }
+      50% { transform: translateY(-6px); }
+    }
+
+    .animate-bob {
+      animation: floatBob 3s ease-in-out infinite;
+    }
+
+    @keyframes popIn {
+      0% { opacity: 0; transform: scale(0.86) translateY(14px); }
+      100% { opacity: 1; transform: scale(1) translateY(0); }
+    }
+
+    .animate-pop-in {
+      animation: popIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    }
+
+    .custom-scroll::-webkit-scrollbar {
+      width: 8px;
+    }
+    .custom-scroll::-webkit-scrollbar-track {
+      background: #e0f2fe;
+      border-radius: 999px;
+    }
+    .custom-scroll::-webkit-scrollbar-thumb {
+      background: #38bdf8;
+      border-radius: 999px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- =====================================================================
+       KANVAS UTAMA DUNIA BAWAH LAUT 3D-STYLE
+       ===================================================================== -->
+  <canvas id="oceanCanvas"></canvas>
+
+  <!-- =====================================================================
+       TOAST NOTIFIKASI RAMAH ANAK (PENGGANTI ALERT)
+       ===================================================================== -->
+  <div id="toastContainer" class="fixed top-20 left-1/2 -translate-x-1/2 z-50 pointer-events-none flex flex-col items-center gap-2 w-full max-w-md px-4"></div>
+
+  <!-- =====================================================================
+       MINI PREVIEW KAMERA (PIP MIRRORED + LANDMARK TELAPAK TANGAN)
+       ===================================================================== -->
+  <div id="cameraPipWidget" class="hidden fixed bottom-3 left-3 z-40 rounded-2xl overflow-hidden border-4 border-white shadow-2xl bg-slate-900 w-36 sm:w-44 aspect-[4/3] transition-all">
+    <video id="webcamVideo" class="hidden" playsinline autoplay muted></video>
+    <canvas id="palmOverlayCanvas" class="w-full h-full block"></canvas>
+    <div id="palmStatusBadge" class="absolute bottom-1.5 left-1.5 right-1.5 px-2 py-0.5 rounded-lg bg-slate-900/80 text-white text-[10px] sm:text-xs font-bold text-center truncate">
+      Tunjukkan Telapak Tangan ✋
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       NAVBAR / HUD ATAS SAAT BERMAIN
+       ===================================================================== -->
+  <header id="gameHud" class="hidden fixed top-0 left-0 right-0 z-30 px-2 sm:px-4 pt-2 sm:pt-3 pointer-events-none">
+    <div class="max-w-6xl mx-auto flex flex-col gap-2">
+      <!-- Baris Utama HUD: Pemain, Misi, Skor, Timer, Nyawa & Tombol Kontrol -->
+      <div class="pointer-events-auto ocean-glass rounded-2xl px-3 py-2 sm:px-4 sm:py-2.5 flex flex-wrap items-center justify-between gap-2">
+        <!-- Kiri: Ikon Penyelam & Nama Siswa -->
+        <div class="flex items-center gap-2 sm:gap-2.5">
+          <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center text-white text-lg sm:text-xl shadow-md border-2 border-white">
+            🤿
+          </div>
+          <div>
+            <div class="text-[10px] sm:text-xs font-extrabold uppercase tracking-wider text-sky-700 leading-none">
+              Penyelam Cilik
+            </div>
+            <div id="hudPlayerName" class="font-display text-sm sm:text-base font-bold text-slate-800 leading-tight max-w-[110px] sm:max-w-[165px] truncate">
+              Siswa Hebat
+            </div>
+          </div>
+        </div>
+
+        <!-- Tengah: Misi & Progres Soal + Badge LOTS/MOTS/HOTS -->
+        <div class="flex items-center gap-1.5 sm:gap-2">
+          <div class="px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-xl bg-sky-100 border-2 border-sky-300 text-sky-900 font-display font-bold text-xs sm:text-sm">
+            Misi <span id="hudMissionNum">1</span> • Soal <span id="hudQuestionNum">1</span>/3
+            <span id="hudCogBadge" class="ml-1 px-1.5 py-0.5 text-[10px] rounded-md bg-emerald-600 text-white">LOTS</span>
+          </div>
+        </div>
+
+        <!-- Kanan: Skor, Timer Mundur, Nyawa, Kamera, Audio & Peta -->
+        <div class="flex items-center gap-1.5 sm:gap-2">
+          <!-- Skor -->
+          <div class="px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-xl bg-amber-100 border-2 border-amber-300 flex items-center gap-1">
+            <span class="text-xs sm:text-sm">⭐</span>
+            <span id="hudScore" class="font-display font-bold text-amber-900 text-xs sm:text-base">0</span>
+          </div>
+
+          <!-- Timer Mundur -->
+          <div id="hudTimerBox" class="px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-xl bg-cyan-100 border-2 border-cyan-300 flex items-center gap-1 transition-colors">
+            <span class="text-xs sm:text-sm">⏳</span>
+            <span id="hudTimer" class="font-display font-bold text-cyan-900 text-xs sm:text-sm tabular-nums">45s</span>
+          </div>
+
+          <!-- Nyawa (3 Hati / Oksigen) -->
+          <div id="hudLivesBox" class="px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-xl bg-rose-50 border-2 border-rose-200 flex items-center gap-0.5 text-xs sm:text-sm" title="Nyawa Oksigen">
+            ❤️❤️❤️
+          </div>
+
+          <!-- Tombol Kamera Gesture -->
+          <button id="hudCamBtn" type="button" title="Aktifkan/Matikan Kamera Gesture"
+            class="btn-arcade px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 border-2 border-slate-300 text-slate-700 text-xs sm:text-sm font-bold flex items-center gap-1">
+            <span>📷</span>
+            <span id="hudCamLabel" class="hidden md:inline">Kamera OFF</span>
+          </button>
+
+          <!-- Tombol Audio -->
+          <button id="hudMuteBtn" type="button" title="Suara Efek"
+            class="btn-arcade px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 border-2 border-slate-300 text-slate-700 text-xs sm:text-sm font-bold">
+            <span id="hudMuteIcon">🔊</span>
+          </button>
+
+          <!-- Tombol Peta Misi -->
+          <button id="hudMapBtn" type="button" title="Kembali ke Peta Misi"
+            class="btn-arcade px-2.5 py-1.5 rounded-xl bg-amber-100 hover:bg-amber-200 border-2 border-amber-300 text-amber-800 text-xs sm:text-sm font-bold">
+            🗺️
+          </button>
+        </div>
+      </div>
+
+      <!-- Kotak Pertanyaan & Bilah Timer Visual -->
+      <div class="pointer-events-auto ocean-glass rounded-2xl px-4 py-2.5 sm:px-6 sm:py-3 shadow-xl border-2 border-cyan-300 relative overflow-hidden">
+        <!-- Bilah Kemajuan Waktu -->
+        <div class="absolute top-0 left-0 right-0 h-1.5 bg-slate-200">
+          <div id="timerProgressBar" class="h-full bg-gradient-to-r from-emerald-400 via-sky-500 to-amber-400 transition-all duration-300" style="width: 100%"></div>
+        </div>
+
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-1 pt-0.5">
+          <span id="hudMissionTitle" class="text-[11px] sm:text-xs font-extrabold uppercase tracking-wider text-sky-700">
+            Misi 1: Taman Terumbu Karang Dangkal
+          </span>
+          <span id="graceIndicator" class="text-[11px] sm:text-xs font-extrabold text-emerald-700">
+            Gerakkan penyelam ke kapsul jawaban yang benar! 🤿
+          </span>
+        </div>
+        <p id="questionPromptText" class="text-slate-800 font-extrabold text-sm sm:text-lg md:text-xl leading-snug">
+          Memuat pertanyaan bawah laut...
+        </p>
+      </div>
+    </div>
+  </header>
+
+  <!-- =====================================================================
+       1. LAYAR AWAL (TITLE, IDENTITAS PEMBELAJARAN, INPUT NAMA & PETA 5 MISI)
+       ===================================================================== -->
+  <section id="startScreen" class="fixed inset-0 z-30 flex items-center justify-center p-3 sm:p-5 overflow-y-auto custom-scroll">
+    <div class="ocean-glass rounded-3xl w-full max-w-4xl p-5 sm:p-7 my-auto animate-pop-in">
+      <!-- Judul & Identitas Pembelajaran -->
+      <div class="text-center mb-5">
+        <div class="inline-flex flex-wrap items-center justify-center gap-1.5 px-3.5 py-1 rounded-full bg-sky-100 border-2 border-sky-300 text-sky-900 text-xs sm:text-sm font-extrabold mb-2">
+          <span>🐠</span>
+          <span id="metaMapelText">IPAS (Ilmu Pengetahuan Alam dan Sosial)</span>
+          <span>•</span>
+          <span id="metaKelasText">Kelas 4 SD</span>
+        </div>
+        <h1 class="font-display text-2xl sm:text-4xl md:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-sky-600 via-cyan-600 to-emerald-600 drop-shadow-sm">
+          OCEAN ADVENTURE
+        </h1>
+        <p class="font-display text-base sm:text-xl font-bold text-amber-600 -mt-1">
+          🌊 PETUALANGAN BAWAH LAUT 🌊
+        </p>
+        <p id="metaMateriText" class="text-xs sm:text-sm font-bold text-slate-600 mt-1">
+          Materi: Ekosistem Laut &amp; Pelestarian Lingkungan Perairan
+        </p>
+      </div>
+
+      <!-- Grid 2 Kolom: Setup Siswa & Kontrol | Peta 5 Misi Berurutan -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
+        <!-- Kolom Kiri -->
+        <div class="lg:col-span-5 flex flex-col justify-between bg-sky-50/90 rounded-2xl p-4 border-2 border-sky-200 gap-4">
+          <div class="space-y-3">
+            <div>
+              <label for="studentNameInput" class="block font-display text-sm sm:text-base font-bold text-slate-700 mb-1">
+                🤿 Nama Siswa Penyelam (Wajib Diisi):
+              </label>
+              <input
+                id="studentNameInput"
+                type="text"
+                maxlength="24"
+                placeholder="Contoh: Budi atau Aisyah..."
+                class="w-full px-3.5 py-2.5 rounded-xl bg-white border-2 border-sky-300 focus:border-cyan-500 focus:outline-none font-bold text-slate-800 text-sm sm:text-base shadow-inner"
+              />
+            </div>
+
+            <!-- Kontrol Kamera Gesture (Manual Activation) -->
+            <div class="bg-white rounded-xl p-3 border-2 border-cyan-200">
+              <div class="flex items-center justify-between mb-1">
+                <span class="font-display text-xs sm:text-sm font-bold text-slate-700">✋ Kontrol Gesture Telapak Tangan</span>
+                <span id="startCamBadge" class="px-2 py-0.5 rounded-full text-[11px] font-extrabold bg-slate-200 text-slate-700">
+                  OFF
+                </span>
+              </div>
+              <p class="text-xs text-slate-600 leading-relaxed mb-2.5">
+                Gerakkan <b>telapak tangan</b> di depan kamera untuk mengarahkan penyelam, atau gunakan <b>mouse / layar sentuh</b> kapan saja.
+              </p>
+              <button id="startCamToggleBtn" type="button" class="btn-arcade btn-ocean w-full py-2 px-3 rounded-xl text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2">
+                <span>📷</span>
+                <span id="startCamBtnText">Aktifkan Kamera Gesture</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Tombol Mode Guru & Reset Progres -->
+          <div class="flex flex-wrap gap-2 pt-1">
+            <button id="openTeacherBtn" type="button" class="btn-arcade btn-purple flex-1 py-2.5 px-3 rounded-xl text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5">
+              <span>👩‍🏫</span>
+              <span>Mode Guru (Edit Soal &amp; Identitas)</span>
+            </button>
+            <button id="resetProgressBtn" type="button" title="Ulangi Progres Misi" class="btn-arcade py-2.5 px-3 rounded-xl bg-slate-200 hover:bg-slate-300 border-2 border-slate-300 text-slate-700 font-bold text-xs">
+              🔄 Reset
+            </button>
+          </div>
+        </div>
+
+        <!-- Kolom Kanan: Peta 5 Misi Terbuka Berurutan -->
+        <div class="lg:col-span-7 flex flex-col justify-between bg-cyan-50/90 rounded-2xl p-4 border-2 border-cyan-200">
+          <div>
+            <div class="flex items-center justify-between mb-3">
+              <h2 class="font-display text-base sm:text-lg font-bold text-sky-900">
+                🧭 Peta 5 Misi Penyelamatan Laut
+              </h2>
+              <span class="text-xs font-extrabold text-amber-800 bg-amber-200/80 px-2.5 py-1 rounded-full">
+                Total Skor: <span id="startTotalScore">0</span>
+              </span>
+            </div>
+
+            <div id="missionCardsGrid" class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <!-- Kartu 5 Misi dirender dinamis -->
+            </div>
+          </div>
+
+          <div class="mt-4 pt-3 border-t-2 border-cyan-200/80">
+            <button id="startAdventureBtn" type="button" class="btn-arcade btn-emerald w-full py-3.5 px-5 rounded-2xl text-white font-bold text-base sm:text-lg flex items-center justify-center gap-2 shadow-lg">
+              <span>🚀</span>
+              <span id="startAdventureBtnLabel">Mulai Petualangan!</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =====================================================================
+       MODAL UMPAN BALIK JAWABAN (BENAR / SALAH RAMAH ANAK)
+       ===================================================================== -->
+  <div id="feedbackModal" class="hidden fixed inset-0 z-40 bg-slate-900/45 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="ocean-glass rounded-3xl max-w-lg w-full p-5 sm:p-7 text-center animate-pop-in">
+      <div id="fbEmoji" class="text-5xl sm:text-6xl mb-2 animate-bob">🌟</div>
+      <h3 id="fbTitle" class="font-display text-2xl sm:text-3xl font-bold text-emerald-600 mb-1">
+        Hebat Sekali!
+      </h3>
+      <p id="fbSubtitle" class="font-extrabold text-sm sm:text-base text-slate-700 mb-3">
+        Jawabanmu benar! +100 Poin!
+      </p>
+
+      <div class="bg-amber-50 border-2 border-amber-300 rounded-2xl p-3.5 sm:p-4 text-left mb-5">
+        <div class="text-xs font-extrabold uppercase tracking-wider text-amber-700 mb-1">
+          🐠 Tahukah Kamu, Penyelam Cerdas?
+        </div>
+        <p id="fbExplanation" class="text-slate-700 font-bold text-xs sm:text-sm leading-relaxed">
+          Penjelasan edukatif tampil di sini.
+        </p>
+      </div>
+
+      <button id="fbContinueBtn" type="button" class="btn-arcade btn-emerald w-full py-3 px-6 rounded-2xl text-white font-bold text-base sm:text-lg">
+        Lanjut Menyelam ➡️
+      </button>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       MODAL MISI GAGAL (OKSIGEN / NYAWA HABIS ATAU WAKTU HABIS)
+       ===================================================================== -->
+  <div id="missionFailModal" class="hidden fixed inset-0 z-40 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="ocean-glass rounded-3xl max-w-md w-full p-6 text-center animate-pop-in border-4 border-rose-300">
+      <div class="text-5xl sm:text-6xl mb-2">🫧</div>
+      <h3 id="failTitle" class="font-display text-2xl sm:text-3xl font-bold text-rose-600 mb-1">
+        Oksigen Habis!
+      </h3>
+      <p id="failMessage" class="text-slate-700 font-bold text-sm sm:text-base mb-5 leading-relaxed">
+        Jangan menyerah! Ayo isi ulang tabung oksigenmu dan coba lagi misi ini!
+      </p>
+      <div class="flex flex-col sm:flex-row gap-2.5">
+        <button id="failToMapBtn" type="button" class="btn-arcade btn-ocean flex-1 py-3 px-4 rounded-2xl text-white font-bold text-sm sm:text-base">
+          🗺️ Peta Misi
+        </button>
+        <button id="retryMissionBtn" type="button" class="btn-arcade btn-amber flex-1 py-3 px-4 rounded-2xl text-white font-bold text-sm sm:text-base">
+          🔄 Ulangi Misi Ini
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       MODAL SELESAI MISI (MISI 1 - 4)
+       ===================================================================== -->
+  <div id="missionClearModal" class="hidden fixed inset-0 z-40 bg-slate-900/45 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="ocean-glass rounded-3xl max-w-lg w-full p-6 sm:p-7 text-center animate-pop-in border-4 border-cyan-300">
+      <div class="text-5xl sm:text-6xl mb-2 animate-bob">🐚</div>
+      <h3 id="clearTitle" class="font-display text-2xl sm:text-3xl font-bold text-sky-700 mb-1">
+        Misi 1 Berhasil!
+      </h3>
+      <p id="clearSubtitle" class="font-bold text-slate-600 text-sm sm:text-base mb-4">
+        Keren! Misi berikutnya telah terbuka!
+      </p>
+
+      <div class="grid grid-cols-2 gap-3 mb-5">
+        <div class="bg-amber-50 border-2 border-amber-200 rounded-2xl p-3">
+          <div class="text-xs font-extrabold text-amber-700">SKOR MISI INI</div>
+          <div id="clearMissionScore" class="font-display text-2xl font-bold text-amber-600">300</div>
+        </div>
+        <div class="bg-emerald-50 border-2 border-emerald-200 rounded-2xl p-3">
+          <div class="text-xs font-extrabold text-emerald-700">TOTAL SKOR</div>
+          <div id="clearTotalScore" class="font-display text-2xl font-bold text-emerald-600">300</div>
+        </div>
+      </div>
+
+      <div class="flex flex-col sm:flex-row gap-2.5">
+        <button id="clearToMapBtn" type="button" class="btn-arcade btn-ocean flex-1 py-3 px-4 rounded-2xl text-white font-bold text-sm sm:text-base">
+          🗺️ Peta Misi
+        </button>
+        <button id="nextMissionBtn" type="button" class="btn-arcade btn-emerald flex-1 py-3 px-4 rounded-2xl text-white font-bold text-sm sm:text-base">
+          Misi Berikutnya 🚀
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       HALAMAN HASIL AKHIR & APRESIASI PERSONAL (MISI 5 SELESAI)
+       ===================================================================== -->
+  <section id="finalVictoryScreen" class="hidden fixed inset-0 z-40 bg-sky-950/45 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5 overflow-y-auto custom-scroll">
+    <div class="ocean-glass rounded-3xl max-w-2xl w-full p-6 sm:p-8 text-center my-auto animate-pop-in border-4 border-amber-300">
+      <div class="text-6xl sm:text-7xl mb-2 animate-bob">🏆</div>
+      <div class="inline-block px-4 py-1 rounded-full bg-emerald-100 border-2 border-emerald-300 text-emerald-800 font-extrabold text-xs sm:text-sm mb-2">
+        🌊 LAUTAN BERHASIL DISELAMATKAN! 🌊
+      </div>
+      <h2 id="finalHeroTitle" class="font-display text-2xl sm:text-4xl font-bold text-sky-800 mb-2">
+        Hebat Sekali, Penyelam Cilik!
+      </h2>
+      <p id="finalHeroMessage" class="text-slate-700 font-bold text-sm sm:text-base max-w-xl mx-auto mb-5 leading-relaxed">
+        Kamu Adalah Pahlawan Penyelamat Lautan! Seluruh ekosistem laut kembali bersih, indah, dan penuh kehidupan!
+      </p>
+
+      <!-- Statistik & Lencana Prestasi -->
+      <div class="grid grid-cols-3 gap-2.5 sm:gap-4 mb-5">
+        <div class="bg-amber-50 border-2 border-amber-300 rounded-2xl p-3">
+          <div class="text-[11px] sm:text-xs font-extrabold text-amber-700">TOTAL SKOR</div>
+          <div id="finalScoreValue" class="font-display text-xl sm:text-3xl font-bold text-amber-600">1500</div>
+          <div class="text-[10px] sm:text-xs font-bold text-slate-500">Maks 1500 Poin</div>
+        </div>
+        <div class="bg-sky-50 border-2 border-sky-300 rounded-2xl p-3">
+          <div class="text-[11px] sm:text-xs font-extrabold text-sky-700">MISI SELESAI</div>
+          <div class="font-display text-xl sm:text-3xl font-bold text-sky-600">5 / 5</div>
+          <div class="text-[10px] sm:text-xs font-bold text-slate-500">15 Pertanyaan</div>
+        </div>
+        <div class="bg-purple-50 border-2 border-purple-300 rounded-2xl p-3">
+          <div class="text-[11px] sm:text-xs font-extrabold text-purple-700">LENCANA</div>
+          <div id="finalBadgeIcon" class="text-xl sm:text-2xl my-0.5">🔱</div>
+          <div id="finalBadgeName" class="text-[10px] sm:text-xs font-extrabold text-purple-800">Penjaga Samudra</div>
+        </div>
+      </div>
+
+      <!-- Rincian 5 Misi -->
+      <div id="finalMissionSummary" class="grid grid-cols-5 gap-1.5 sm:gap-2 mb-6">
+        <!-- Diisi dinamis -->
+      </div>
+
+      <div class="flex flex-col sm:flex-row gap-3 justify-center">
+        <button id="playAgainAllBtn" type="button" class="btn-arcade btn-emerald py-3.5 px-7 rounded-2xl text-white font-bold text-base sm:text-lg flex items-center justify-center gap-2">
+          <span>🔄</span>
+          <span>Main Lagi / Ulang Permainan</span>
+        </button>
+        <button id="victoryToMapBtn" type="button" class="btn-arcade btn-ocean py-3.5 px-6 rounded-2xl text-white font-bold text-base sm:text-lg flex items-center justify-center gap-2">
+          <span>🗺️</span>
+          <span>Kembali ke Peta Misi</span>
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- =====================================================================
+       MODAL MODE GURU (EDIT IDENTITAS & 15 SOAL LOTS / MOTS / HOTS)
+       ===================================================================== -->
+  <div id="teacherModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5">
+    <div class="ocean-glass rounded-3xl max-w-3xl w-full max-h-[90vh] flex flex-col overflow-hidden animate-pop-in">
+      <div class="px-5 py-4 bg-purple-700 text-white flex items-center justify-between">
+        <div>
+          <h3 class="font-display text-lg sm:text-2xl font-bold">👩‍🏫 Mode Guru – Edit Soal &amp; Identitas</h3>
+          <p class="text-xs text-purple-100">Sesuaikan Mata Pelajaran, Materi, Kelas, serta 5 Misi (15 Soal LOTS, MOTS, HOTS).</p>
+        </div>
+        <button id="closeTeacherBtn" type="button" class="w-9 h-9 rounded-xl bg-white/20 hover:bg-white/30 font-bold text-lg">✕</button>
+      </div>
+
+      <div class="p-4 sm:p-6 overflow-y-auto custom-scroll space-y-5">
+        <!-- Edit Identitas Pembelajaran -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-purple-50 p-3.5 rounded-2xl border-2 border-purple-200">
+          <div>
+            <label class="block text-xs font-extrabold text-purple-900 mb-1">Mata Pelajaran</label>
+            <input id="tMapelInput" type="text" class="w-full px-3 py-2 rounded-xl border-2 border-purple-200 text-sm font-bold text-slate-800" />
+          </div>
+          <div>
+            <label class="block text-xs font-extrabold text-purple-900 mb-1">Materi Pembelajaran</label>
+            <input id="tMateriInput" type="text" class="w-full px-3 py-2 rounded-xl border-2 border-purple-200 text-sm font-bold text-slate-800" />
+          </div>
+          <div>
+            <label class="block text-xs font-extrabold text-purple-900 mb-1">Kelas</label>
+            <input id="tKelasInput" type="text" class="w-full px-3 py-2 rounded-xl border-2 border-purple-200 text-sm font-bold text-slate-800" />
+          </div>
+        </div>
+
+        <!-- Tab Misi 1-5 -->
+        <div>
+          <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+            <label class="font-display text-base font-bold text-slate-800">Pilih Misi untuk Diedit:</label>
+            <div id="tMissionTabs" class="flex flex-wrap gap-1.5"></div>
+          </div>
+
+          <div class="mb-3">
+            <label class="block text-xs font-extrabold text-slate-600 mb-1">Judul Misi</label>
+            <input id="tMissionTitleInput" type="text" class="w-full px-3 py-2 rounded-xl border-2 border-slate-200 text-sm font-bold text-slate-800" />
+          </div>
+
+          <div id="tQuestionsList" class="space-y-4"></div>
+        </div>
+      </div>
+
+      <div class="px-5 py-3.5 bg-slate-100 border-t-2 border-slate-200 flex flex-wrap items-center justify-between gap-2">
+        <button id="tResetDefaultBtn" type="button" class="btn-arcade px-4 py-2 rounded-xl bg-rose-100 hover:bg-rose-200 border-2 border-rose-300 text-rose-800 font-bold text-xs sm:text-sm">
+          ♻️ Reset ke Default
+        </button>
+        <div class="flex gap-2">
+          <button id="tCancelBtn" type="button" class="btn-arcade px-4 py-2 rounded-xl bg-slate-200 text-slate-700 font-bold text-xs sm:text-sm">
+            Batal
+          </button>
+          <button id="tSaveBtn" type="button" class="btn-arcade btn-emerald px-5 py-2 rounded-xl text-white font-bold text-xs sm:text-sm">
+            💾 Simpan Perubahan
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       LOGIKA GAME LENGKAP: DUNIA BAWAH LAUT 3D-STYLE, MEDIAPIPE HANDS & AUDIO
+       ===================================================================== -->
+  <script>
+    /*************************************************************************
+     * 1. BANK DATA DEFAULT (5 MISI x 3 PERTANYAAN: LOTS, MOTS, HOTS)
+     *************************************************************************/
+    const DEFAULT_OCEAN_DATA = {
+      meta: {
+        mataPelajaran: "IPAS (Ilmu Pengetahuan Alam dan Sosial)",
+        materi: "Ekosistem Laut & Pelestarian Lingkungan Perairan",
+        kelas: "Kelas 4 SD"
+      },
+      missions: [
+        {
+          id: 1,
+          title: "Taman Terumbu Karang Dangkal",
+          palette: { top: "#38bdf8", mid: "#0284c7", bottom: "#0c4a6e", sand: "#fde68a" },
+          questions: [
+            {
+              level: "LOTS",
+              question: "Saat berwisata ke pantai yang jernih, Rina melihat kumpulan terumbu karang tempat ikan-ikan kecil bersembunyi. Terumbu karang di laut berperan penting sebagai...",
+              options: [
+                "Rumah dan tempat berlindung ikan",
+                "Sumber asap bagi kapal nelayan",
+                "Tempat membuang botol plastik",
+                "Penghasil garam dapur langsung"
+              ],
+              correctIndex: 0,
+              explanation: "Terumbu karang adalah 'hutan hujan di dasar laut' yang menjadi rumah, tempat mencari makan, dan tempat berlindung bagi ribuan jenis ikan kecil!"
+            },
+            {
+              level: "MOTS",
+              question: "Ikan badut hidup nyaman di antara tentakel anemon laut yang beracun bagi pemangsa, sedangkan anemon dibersihkan dari sisa kotoran oleh ikan badut. Hubungan ini disebut simbiosis...",
+              options: [
+                "Mutualisme (saling menguntungkan)",
+                "Parasitisme (satu dirugikan)",
+                "Kompetisi (saling berebut)",
+                "Predasi (saling memangsa)"
+              ],
+              correctIndex: 0,
+              explanation: "Simbiosis mutualisme adalah kerja sama dua makhluk hidup yang saling menguntungkan: ikan badut terlindungi, dan anemon laut menjadi bersih!"
+            },
+            {
+              level: "HOTS",
+              question: "Beberapa pengunjung pantai menginjak dan mematahkan terumbu karang untuk dijadikan hiasan di rumah. Jika kebiasaan ini terus terjadi, dampak paling berbahaya bagi nelayan adalah...",
+              options: [
+                "Ikan berkurang karena kehilangan rumah",
+                "Air laut berubah menjadi terasa tawar",
+                "Pasir pantai berubah menjadi batu bara",
+                "Ombak laut berhenti bergerak selamanya"
+              ],
+              correctIndex: 0,
+              explanation: "Jika terumbu karang rusak, ikan-ikan kehilangan tempat tinggal dan berkembang biak sehingga hasil tangkapan nelayan pun ikut menurun."
+            }
+          ]
+        },
+        {
+          id: 2,
+          title: "Hutan Rumput Laut Ajaib",
+          palette: { top: "#2dd4bf", mid: "#0d9488", bottom: "#115e59", sand: "#fcd34d" },
+          questions: [
+            {
+              level: "LOTS",
+              question: "Dalam rantai makanan di laut: Fitoplankton → Udang Kecil → Ikan Tongkol → Hiu. Makhluk hidup yang berperan sebagai produsen penghasil makanan sendiri adalah...",
+              options: [
+                "Fitoplankton",
+                "Udang Kecil",
+                "Ikan Tongkol",
+                "Hiu"
+              ],
+              correctIndex: 0,
+              explanation: "Fitoplankton adalah tumbuhan mikroskopis di laut yang berfotosintesis menggunakan sinar matahari sehingga menjadi produsen utama."
+            },
+            {
+              level: "MOTS",
+              question: "Penyu hijau sangat gemar memakan rumput laut dan ubur-ubur. Namun, penyu sering sakit karena menelan kantong plastik bening yang mengapung di air. Hal ini terjadi karena kantong plastik...",
+              options: [
+                "Mirip bentuk ubur-ubur makanan penyu",
+                "Berbau harum seperti buah mangga",
+                "Terbuat dari rumput laut yang dikeringkan",
+                "Dapat mencair menjadi air minum penyu"
+              ],
+              correctIndex: 0,
+              explanation: "Kantong plastik transparan yang melayang di air tampak persis seperti ubur-ubur, sehingga penyu tidak sengaja memakannya."
+            },
+            {
+              level: "HOTS",
+              question: "Keluarga Andi membawa bekal makan siang saat piknik di tepi pantai. Langkah paling bijak agar tidak ada sampah plastik yang terbawa angin ke laut adalah...",
+              options: [
+                "Membawa wadah makan & botol minum ulang",
+                "Mengubur bungkus plastik di dalam pasir",
+                "Membuang plastik di dekat semak pantai",
+                "Membakar semua plastik di pinggir pantai"
+              ],
+              correctIndex: 0,
+              explanation: "Menggunakan wadah makan dan botol minum isi ulang (reusable) mencegah timbulnya sampah plastik sekali pakai sejak awal!"
+            }
+          ]
+        },
+        {
+          id: 3,
+          title: "Gua Kristal & Palung Biru",
+          palette: { top: "#0ea5e9", mid: "#0369a1", bottom: "#1e3a8a", sand: "#fde047" },
+          questions: [
+            {
+              level: "LOTS",
+              question: "Sebagian besar permukaan Bumi kita ditutupi oleh perairan laut yang luas. Air laut memiliki rasa asin karena mengandung banyak...",
+              options: [
+                "Garam mineral terlarut",
+                "Gula pasir dari sungai",
+                "Minyak goreng alami",
+                "Tepung terigu halus"
+              ],
+              correctIndex: 0,
+              explanation: "Air sungai membawa mineral dari batuan di daratan menuju laut selama jutaan tahun sehingga air laut kaya akan garam mineral."
+            },
+            {
+              level: "MOTS",
+              question: "Sinar matahari membantu tumbuhan laut seperti lamun dan rumput laut melakukan fotosintesis. Oleh karena itu, hutan rumput laut banyak tumbuh subur di bagian laut yang...",
+              options: [
+                "Dangkal dan masih tembus cahaya matahari",
+                "Sangat dalam dan gelap gulita tanpa cahaya",
+                "Tertutup lapisan minyak kapal yang tebal",
+                "Membeku menjadi es sepanjang tahun"
+              ],
+              correctIndex: 0,
+              explanation: "Fotosintesis memerlukan cahaya matahari, sehingga tumbuhan laut tumbuh subur di zona perairan dangkal yang terang."
+            },
+            {
+              level: "HOTS",
+              question: "Sebuah pabrik membuang limbah cair panas dan beracun langsung ke sungai yang bermuara ke laut. Mengapa warga di desa pesisir pantai juga ikut merasakan kerugiannya?",
+              options: [
+                "Sungai mengalirkan racun ke laut & meracuni ikan",
+                "Air laut akan langsung mengering dalam sehari",
+                "Pasir pantai berubah menjadi lumpur salju",
+                "Perahu nelayan tidak bisa mengapung lagi"
+              ],
+              correctIndex: 0,
+              explanation: "Sungai dan laut saling terhubung! Limbah yang dibuang ke sungai akhirnya mengalir ke muara dan mencemari ekosistem laut."
+            }
+          ]
+        },
+        {
+          id: 4,
+          title: "Kapal Karam Bersejarah",
+          palette: { top: "#2563eb", mid: "#1d4ed8", bottom: "#1e1b4b", sand: "#fbbf24" },
+          questions: [
+            {
+              level: "LOTS",
+              question: "Lumba-lumba dan paus hidup di samudra luas, tetapi mereka sering muncul ke permukaan air laut secara berkala karena bernapas menggunakan...",
+              options: [
+                "Paru-paru",
+                "Insang",
+                "Kulit basah",
+                "Trakea"
+              ],
+              correctIndex: 0,
+              explanation: "Lumba-lumba dan paus adalah mamalia laut yang bernapas dengan paru-paru sehingga perlu naik ke permukaan untuk menghirup udara."
+            },
+            {
+              level: "MOTS",
+              question: "Di sekitar pantai yang rawan ombak besar, warga menanam pohon bakau (mangrove). Manfaat utama hutan bakau bagi pesisir pantai adalah...",
+              options: [
+                "Menahan abrasi ombak & tempat hidup kepiting",
+                "Mengeringkan air laut menjadi padang pasir",
+                "Mengusir semua burung pantai agar menjauh",
+                "Membuat gelombang tsunami menjadi lebih besar"
+              ],
+              correctIndex: 0,
+              explanation: "Akar pohon bakau yang kokoh memecah ombak sehingga mencegah pengikisan pantai (abrasi) serta menjadi rumah kepiting dan ikan kecil."
+            },
+            {
+              level: "HOTS",
+              question: "Seorang nelayan ingin menangkap ikan dengan cepat menggunakan bahan peledak (bom ikan). Sebagai penjaga laut yang cerdas, alasan terkuat untuk melarang cara tersebut adalah...",
+              options: [
+                "Bom ikan menghancurkan terumbu & ikan kecil",
+                "Suara ledakan membuat air laut terasa manis",
+                "Bom ikan membuat jaring nelayan terlalu berat",
+                "Ikan besar akan pindah ke kolam air tawar"
+              ],
+              correctIndex: 0,
+              explanation: "Bom ikan tidak hanya menangkap ikan besar, tetapi juga membunuh bibit ikan kecil dan menghancurkan terumbu karang yang butuh puluhan tahun untuk pulih."
+            }
+          ]
+        },
+        {
+          id: 5,
+          title: "Istana Samudra – Penyelamatan Lautan",
+          palette: { top: "#06b6d4", mid: "#0284c7", bottom: "#172554", sand: "#fde68a" },
+          questions: [
+            {
+              level: "LOTS",
+              question: "Kegiatan membersihkan sampah di pantai secara bersama-sama oleh siswa, guru, dan warga masyarakat merupakan contoh pengamalan sikap...",
+              options: [
+                "Gotong royong peduli lingkungan",
+                "Sikap acuh tak acuh terhadap alam",
+                "Persaingan membuang sampah terbanyak",
+                "Merusak fasilitas umum di pantai"
+              ],
+              correctIndex: 0,
+              explanation: "Gotong royong membersihkan pantai membuat pekerjaan berat menjadi ringan dan menjaga ekosistem laut tetap bersih."
+            },
+            {
+              level: "MOTS",
+              question: "Penangkaran tukik (anak penyu) di pesisir pantai membantu melestarikan populasi penyu dengan cara...",
+              options: [
+                "Melindungi telur penyu hingga siap dilepas ke laut",
+                "Mengurung penyu dewasa di kolam kaca selamanya",
+                "Menjual cangkang penyu sebagai cendera mata",
+                "Mengganti makanan penyu dengan roti manis"
+              ],
+              correctIndex: 0,
+              explanation: "Di penangkaran, telur penyu dijaga dari predator hingga menetas menjadi tukik sehat lalu dilepasliarkan kembali ke samudra!"
+            },
+            {
+              level: "HOTS",
+              question: "Kamu diminta membuat poster kampanye 'Selamatkan Lautan Kita' di sekolah. Pesan ajakan nyata yang paling efektif untuk teman-teman SD adalah...",
+              options: [
+                "Bawa tumbler sendiri & buang sampah di tempatnya!",
+                "Tangkap semua ikan hias laut untuk dipelihara!",
+                "Gunakan kantong plastik baru setiap membeli jajan!",
+                "Biarkan sampah hanyut di selokan menuju laut!"
+              ],
+              correctIndex: 0,
+              explanation: "Membawa botol minum sendiri (tumbler) dan membuang sampah pada tempatnya adalah aksi nyata sehari-hari yang menyelamatkan lautan!"
+            }
+          ]
+        }
+      ]
+    };
+
+    const STORAGE_OCEAN_DATA = "ocean_adventure_data_v1";
+    const STORAGE_OCEAN_PROGRESS = "ocean_adventure_progress_v1";
+    const QUESTION_TIME_LIMIT = 45; // 45 detik per soal
+    const GRACE_PERIOD_DURATION = 1.2; // 1.2 detik jeda aman saat soal baru muncul
+
+    /*************************************************************************
+     * 2. SYNTHESIZER SUARA BAWAH LAUT (WEB AUDIO API - TANPA FILE EKSTERNAL)
+     *************************************************************************/
+    class OceanAudioEngine {
+      constructor() {
+        this.ctx = null;
+        this.muted = false;
+      }
+
+      init() {
+        if (!this.ctx) {
+          const AudioCtx = window.AudioContext || window.webkitAudioContext;
+          if (AudioCtx) this.ctx = new AudioCtx();
+        }
+        if (this.ctx && this.ctx.state === "suspended") {
+          this.ctx.resume();
+        }
+      }
+
+      toggleMute() {
+        this.muted = !this.muted;
+        return this.muted;
+      }
+
+      playBubble() {
+        if (this.muted) return;
+        this.init();
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = "sine";
+        const baseFreq = 320 + Math.random() * 180;
+        osc.frequency.setValueAtTime(baseFreq, now);
+        osc.frequency.exponentialRampToValueAtTime(baseFreq * 1.85, now + 0.09);
+        gain.gain.setValueAtTime(0.06, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.11);
+      }
+
+      playCorrectChime() {
+        if (this.muted) return;
+        this.init();
+        if (!this.ctx) return;
+        const notes = [523.25, 659.25, 783.99, 1046.5]; // C5 - E5 - G5 - C6
+        notes.forEach((freq, i) => {
+          const now = this.ctx.currentTime + i * 0.08;
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = "triangle";
+          osc.frequency.setValueAtTime(freq, now);
+          gain.gain.setValueAtTime(0.22, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.31);
+        });
+      }
+
+      playWrongGentle() {
+        if (this.muted) return;
+        this.init();
+        if (!this.ctx) return;
+        const notes = [349.23, 293.66]; // F4 -> D4 lembut
+        notes.forEach((freq, i) => {
+          const now = this.ctx.currentTime + i * 0.15;
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = "sine";
+          osc.frequency.setValueAtTime(freq, now);
+          osc.frequency.linearRampToValueAtTime(freq - 20, now + 0.2);
+          gain.gain.setValueAtTime(0.2, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.24);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.25);
+        });
+      }
+
+      playVictoryFanfare() {
+        if (this.muted) return;
+        this.init();
+        if (!this.ctx) return;
+        const melody = [523.25, 659.25, 783.99, 659.25, 783.99, 1046.5];
+        const offsets = [0, 0.11, 0.22, 0.34, 0.46, 0.6];
+        melody.forEach((freq, i) => {
+          const now = this.ctx.currentTime + offsets[i];
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = "triangle";
+          osc.frequency.setValueAtTime(freq, now);
+          gain.gain.setValueAtTime(0.24, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.36);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.38);
+        });
+      }
+    }
+
+    const oceanAudio = new OceanAudioEngine();
+
+    /*************************************************************************
+     * 3. STATE MANAJEMEN GAME & PENYIMPANAN LOCALSTORAGE
+     *************************************************************************/
+    let oceanData = loadOceanData();
+    let progress = loadOceanProgress();
+
+    const state = {
+      screen: "start", // 'start' | 'playing' | 'feedback' | 'missionClear' | 'missionFail' | 'victory'
+      playerName: progress.playerName || "",
+      missionIdx: 0, // 0..4
+      questionIdx: 0, // 0..2
+      missionScore: 0,
+      lives: 3,
+      timeLeft: QUESTION_TIME_LIMIT,
+      timerHandle: null,
+      graceTimer: 0, // > 0 artinya kapsul belum bisa dipicu (grace period 1.2 detik)
+      canCollect: true,
+
+      // Posisi & Animasi Penyelam (Diver)
+      diver: {
+        x: window.innerWidth * 0.5,
+        y: window.innerHeight * 0.58,
+        targetX: window.innerWidth * 0.5,
+        targetY: window.innerHeight * 0.58,
+        vx: 0,
+        vy: 0,
+        facing: 1, // 1 = kanan, -1 = kiri
+        kickPhase: 0,
+        bubbleTimer: 0
+      },
+
+      // Kamera & MediaPipe Hands
+      cameraActive: false,
+      cameraStarting: false,
+      handsDetector: null,
+      cameraUtilsInstance: null,
+      mediaStream: null,
+      palmDetected: false,
+
+      // Objek Dunia Bawah Laut
+      capsules: [],
+      fishes: [],
+      seaweeds: [],
+      ambientBubbles: [],
+      particles: [],
+      floatingPopups: [],
+      oceanSavedGlow: 0
+    };
+
+    function loadOceanData() {
+      try {
+        const raw = localStorage.getItem(STORAGE_OCEAN_DATA);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && parsed.meta && Array.isArray(parsed.missions) && parsed.missions.length === 5) {
+            return parsed;
+          }
+        }
+      } catch (e) {
+        console.warn("Gagal memuat data kustom:", e);
+      }
+      return JSON.parse(JSON.stringify(DEFAULT_OCEAN_DATA));
+    }
+
+    function saveOceanData() {
+      try {
+        localStorage.setItem(STORAGE_OCEAN_DATA, JSON.stringify(oceanData));
+      } catch (e) {
+        console.warn("Gagal menyimpan data kustom:", e);
+      }
+    }
+
+    function loadOceanProgress() {
+      try {
+        const raw = localStorage.getItem(STORAGE_OCEAN_PROGRESS);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          return {
+            playerName: parsed.playerName || "",
+            unlockedMission: Math.min(5, Math.max(1, parsed.unlockedMission || 1)),
+            missionScores:
+              Array.isArray(parsed.missionScores) && parsed.missionScores.length === 5
+                ? parsed.missionScores
+                : [0, 0, 0, 0, 0]
+          };
+        }
+      } catch (e) {
+        console.warn("Gagal memuat progres:", e);
+      }
+      return {
+        playerName: "",
+        unlockedMission: 1,
+        missionScores: [0, 0, 0, 0, 0]
+      };
+    }
+
+    function saveOceanProgress() {
+      try {
+        progress.playerName = state.playerName;
+        localStorage.setItem(STORAGE_OCEAN_PROGRESS, JSON.stringify(progress));
+      } catch (e) {
+        console.warn("Gagal menyimpan progres:", e);
+      }
+    }
+
+    function showToast(msg, type = "info") {
+      const container = document.getElementById("toastContainer");
+      const el = document.createElement("div");
+      const themes = {
+        info: "bg-sky-600 text-white border-sky-200",
+        success: "bg-emerald-600 text-white border-emerald-200",
+        warning: "bg-amber-500 text-white border-amber-200",
+        error: "bg-rose-600 text-white border-rose-200"
+      };
+      el.className = `px-4 py-2.5 rounded-2xl border-2 shadow-xl font-bold text-xs sm:text-sm text-center animate-pop-in ${themes[type] || themes.info}`;
+      el.textContent = msg;
+      container.appendChild(el);
+      setTimeout(() => {
+        el.style.opacity = "0";
+        el.style.transform = "translateY(-8px)";
+        el.style.transition = "all 0.25s ease";
+        setTimeout(() => el.remove(), 260);
+      }, 3200);
+    }
+
+    /*************************************************************************
+     * 4. KANVAS DUNIA BAWAH LAUT 3D-STYLE & INISIALISASI BIOTA LAUT
+     *************************************************************************/
+    const canvas = document.getElementById("oceanCanvas");
+    const ctx = canvas.getContext("2d");
+    let width = window.innerWidth;
+    let height = window.innerHeight;
+    let dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+    function resizeCanvas() {
+      width = window.innerWidth;
+      height = window.innerHeight;
+      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = Math.floor(width * dpr);
+      canvas.height = Math.floor(height * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      layoutAnswerCapsules();
+    }
+
+    window.addEventListener("resize", resizeCanvas);
+
+    // Palet warna 4 kapsul gelembung mutiara jawaban (A, B, C, D)
+    const CAPSULE_THEMES = [
+      { letter: "A", shellTop: "#ff85a1", shellBottom: "#e11d48", pearl: "#ffe4e6", glow: "rgba(251, 113, 133, 0.55)" },
+      { letter: "B", shellTop: "#38bdf8", shellBottom: "#0284c7", pearl: "#e0f2fe", glow: "rgba(56, 189, 248, 0.55)" },
+      { letter: "C", shellTop: "#34d399", shellBottom: "#059669", pearl: "#d1fae5", glow: "rgba(52, 211, 153, 0.55)" },
+      { letter: "D", shellTop: "#c084fc", shellBottom: "#7c3aed", pearl: "#f3e8ff", glow: "rgba(192, 132, 252, 0.55)" }
+    ];
+
+    function initUnderwaterWorld() {
+      // Rumput laut melambai di dasar samudra
+      state.seaweeds = [];
+      const weedCount = Math.max(12, Math.floor(width / 95));
+      for (let i = 0; i < weedCount; i++) {
+        state.seaweeds.push({
+          x: (width / weedCount) * i + Math.random() * 40,
+          height: 75 + Math.random() * 85,
+          segments: 5,
+          phase: Math.random() * Math.PI * 2,
+          color: i % 2 === 0 ? "#10b981" : "#059669"
+        });
+      }
+
+      // Gelembung udara naik ke permukaan
+      state.ambientBubbles = [];
+      for (let i = 0; i < 28; i++) {
+        state.ambientBubbles.push({
+          x: Math.random() * width,
+          y: Math.random() * height,
+          r: 3 + Math.random() * 8,
+          speed: 25 + Math.random() * 45,
+          wobble: Math.random() * Math.PI * 2
+        });
+      }
+
+      // Biota laut kartun lucu: Ikan Badut, Ikan Biru, Penyu Laut Kecil, Ubur-ubur Ramah
+      state.fishes = [
+        { type: "clownfish", x: width * 0.15, y: height * 0.35, vx: 48, scale: 0.95, phase: 0.4 },
+        { type: "bluefish", x: width * 0.82, y: height * 0.48, vx: -55, scale: 0.9, phase: 1.5 },
+        { type: "turtle", x: width * 0.25, y: height * 0.72, vx: 32, scale: 1.05, phase: 2.3 },
+        { type: "jellyfish", x: width * 0.72, y: height * 0.32, vx: -22, scale: 0.85, phase: 3.1 },
+        { type: "clownfish", x: width * 0.6, y: height * 0.78, vx: -42, scale: 0.78, phase: 4.2 },
+        { type: "bluefish", x: width * 0.35, y: height * 0.28, vx: 52, scale: 0.82, phase: 5.0 }
+      ];
+    }
+
+    /*************************************************************************
+     * 5. OBJEK BAWAH LAUT PILIHAN JAWABAN (4 KUADRAN ANTI TUMPUK)
+     *************************************************************************/
+    function spawnCapsulesForQuestion() {
+      const mission = oceanData.missions[state.missionIdx];
+      const q = mission.questions[state.questionIdx];
+      state.capsules = [];
+
+      q.options.forEach((optText, idx) => {
+        const theme = CAPSULE_THEMES[idx];
+        state.capsules.push({
+          index: idx,
+          letter: theme.letter,
+          text: optText,
+          theme,
+          x: width * 0.5,
+          y: height * 0.6,
+          anchorX: width * 0.5,
+          anchorY: height * 0.6,
+          rx: 120,
+          ry: 78,
+          phase: idx * 1.6,
+          scale: 0.2,
+          collected: false
+        });
+      });
+
+      layoutAnswerCapsules();
+    }
+
+    function layoutAnswerCapsules() {
+      if (!state.capsules.length) return;
+      const isMobile = width < 740;
+      const topSafe = Math.max(185, height * 0.34);
+      const bottomSafe = height - 62;
+      const usableH = Math.max(220, bottomSafe - topSafe);
+
+      if (isMobile) {
+        // 2x2 kuadran pada layar ponsel/tablet
+        const rx = Math.min(width * 0.22, 118);
+        const ry = Math.min(usableH * 0.21, 74);
+        const cols = [width * 0.26, width * 0.74];
+        const rows = [topSafe + usableH * 0.26, topSafe + usableH * 0.75];
+
+        state.capsules.forEach((cap, i) => {
+          cap.anchorX = cols[i % 2];
+          cap.anchorY = rows[Math.floor(i / 2)];
+          cap.rx = rx;
+          cap.ry = ry;
+        });
+      } else {
+        // 4 kuadran tersebar seimbang di area laut agar penyelam leluasa berenang di tengah
+        const rx = Math.min(width * 0.135, 148);
+        const ry = Math.min(usableH * 0.22, 82);
+        const positions = [
+          { x: width * 0.21, y: topSafe + usableH * 0.25 }, // Kiri Atas (A)
+          { x: width * 0.79, y: topSafe + usableH * 0.25 }, // Kanan Atas (B)
+          { x: width * 0.21, y: topSafe + usableH * 0.76 }, // Kiri Bawah (C)
+          { x: width * 0.79, y: topSafe + usableH * 0.76 }  // Kanan Bawah (D)
+        ];
+
+        state.capsules.forEach((cap, i) => {
+          cap.anchorX = positions[i].x;
+          cap.anchorY = positions[i].y;
+          cap.rx = rx;
+          cap.ry = ry;
+        });
+      }
+    }
+
+    function spawnCelebrationParticles(x, y, theme) {
+      const colors = [theme.shellTop, "#fde047", "#ffffff", "#34d399", "#38bdf8", "#fbbf24"];
+      for (let i = 0; i < 40; i++) {
+        const angle = (Math.PI * 2 * i) / 40 + (Math.random() - 0.5) * 0.25;
+        const speed = 110 + Math.random() * 260;
+        state.particles.push({
+          x,
+          y,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed - 40,
+          size: 5 + Math.random() * 7,
+          color: colors[i % colors.length],
+          alpha: 1,
+          rot: Math.random() * Math.PI * 2,
+          vRot: (Math.random() - 0.5) * 9,
+          kind: i % 2 === 0 ? "star" : "bubble"
+        });
+      }
+    }
+
+    function spawnFloatingPopup(x, y, text, color = "#10b981") {
+      state.floatingPopups.push({
+        x,
+        y,
+        text,
+        color,
+        alpha: 1,
+        vy: -70
+      });
+    }
+
+    /*************************************************************************
+     * 6. ALUR PERMAINAN: MISI, PERTANYAAN, SKOR, TIMER MUNDUR & NYAWA
+     *************************************************************************/
+    function startCountdownTimer() {
+      stopCountdownTimer();
+      state.timerHandle = setInterval(() => {
+        if (state.screen !== "playing") return;
+        state.timeLeft = Math.max(0, state.timeLeft - 1);
+        updateHud();
+
+        if (state.timeLeft === 0) {
+          stopCountdownTimer();
+          handleMissionFailed("Waktu Habis!", "Waktu untuk soal ini telah habis. Ayo isi ulang oksigenmu dan coba lagi misi ini!");
+        }
+      }, 1000);
+    }
+
+    function stopCountdownTimer() {
+      if (state.timerHandle) {
+        clearInterval(state.timerHandle);
+        state.timerHandle = null;
+      }
+    }
+
+    function startMission(missionIdx) {
+      const nameInput = document.getElementById("studentNameInput").value.trim();
+      if (!nameInput && !state.playerName) {
+        showToast("Tuliskan nama panggilanmu terlebih dahulu sebelum menyelam! 🤿", "warning");
+        document.getElementById("studentNameInput").focus();
+        return;
+      }
+
+      oceanAudio.init();
+      state.playerName = nameInput || state.playerName;
+      saveOceanProgress();
+
+      state.missionIdx = missionIdx;
+      state.questionIdx = 0;
+      state.missionScore = 0;
+      state.lives = 3;
+      state.screen = "playing";
+
+      document.getElementById("startScreen").classList.add("hidden");
+      document.getElementById("feedbackModal").classList.add("hidden");
+      document.getElementById("missionClearModal").classList.add("hidden");
+      document.getElementById("missionFailModal").classList.add("hidden");
+      document.getElementById("finalVictoryScreen").classList.add("hidden");
+      document.getElementById("gameHud").classList.remove("hidden");
+
+      loadQuestion();
+      startCountdownTimer();
+    }
+
+    function loadQuestion() {
+      const mission = oceanData.missions[state.missionIdx];
+      const q = mission.questions[state.questionIdx];
+
+      state.timeLeft = QUESTION_TIME_LIMIT;
+      state.graceTimer = GRACE_PERIOD_DURATION;
+      state.canCollect = true;
+
+      // Tempatkan penyelam di pusat laut agar aman dari 4 kapsul di sudut
+      state.diver.x = width * 0.5;
+      state.diver.y = height * 0.58;
+      state.diver.targetX = width * 0.5;
+      state.diver.targetY = height * 0.58;
+
+      document.getElementById("hudMissionTitle").textContent = `Misi ${mission.id}: ${mission.title}`;
+      document.getElementById("questionPromptText").textContent = q.question;
+
+      const cogBadge = document.getElementById("hudCogBadge");
+      cogBadge.textContent = q.level;
+      if (q.level === "LOTS") cogBadge.className = "ml-1 px-1.5 py-0.5 text-[10px] rounded-md bg-emerald-600 text-white";
+      else if (q.level === "MOTS") cogBadge.className = "ml-1 px-1.5 py-0.5 text-[10px] rounded-md bg-amber-500 text-white";
+      else cogBadge.className = "ml-1 px-1.5 py-0.5 text-[10px] rounded-md bg-rose-600 text-white";
+
+      spawnCapsulesForQuestion();
+      updateHud();
+    }
+
+    function updateHud() {
+      document.getElementById("hudPlayerName").textContent = state.playerName;
+      document.getElementById("hudMissionNum").textContent = state.missionIdx + 1;
+      document.getElementById("hudQuestionNum").textContent = state.questionIdx + 1;
+
+      const otherScore = progress.missionScores.reduce((sum, val, i) => (i === state.missionIdx ? sum : sum + val), 0);
+      document.getElementById("hudScore").textContent = otherScore + state.missionScore;
+
+      // Timer & Progress Bar
+      document.getElementById("hudTimer").textContent = `${state.timeLeft}s`;
+      const pct = Math.max(0, (state.timeLeft / QUESTION_TIME_LIMIT) * 100);
+      document.getElementById("timerProgressBar").style.width = `${pct}%`;
+
+      const timerBox = document.getElementById("hudTimerBox");
+      if (state.timeLeft <= 10) {
+        timerBox.className = "px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-xl bg-rose-100 border-2 border-rose-400 flex items-center gap-1 animate-pulse";
+      } else {
+        timerBox.className = "px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-xl bg-cyan-100 border-2 border-cyan-300 flex items-center gap-1";
+      }
+
+      // Nyawa
+      const hearts = "❤️".repeat(state.lives) + "🖤".repeat(Math.max(0, 3 - state.lives));
+      document.getElementById("hudLivesBox").textContent = hearts;
+
+      // Indikator Grace Period
+      const graceEl = document.getElementById("graceIndicator");
+      if (state.graceTimer > 0) {
+        graceEl.textContent = "Bersiap membidik kapsul jawaban... 🫧";
+        graceEl.className = "text-[11px] sm:text-xs font-extrabold text-amber-600";
+      } else {
+        graceEl.textContent = "Arahkan penyelam ke kapsul jawaban yang benar! 🤿";
+        graceEl.className = "text-[11px] sm:text-xs font-extrabold text-emerald-700";
+      }
+    }
+
+    function checkDiverCapsuleCollision() {
+      if (state.screen !== "playing" || !state.canCollect || state.graceTimer > 0) return;
+
+      for (let i = 0; i < state.capsules.length; i++) {
+        const cap = state.capsules[i];
+        if (cap.collected) continue;
+
+        // Jarak elips antara pusat penyelam dan kapsul jawaban
+        const dx = (state.diver.x - cap.x) / (cap.rx + 24);
+        const dy = (state.diver.y - cap.y) / (cap.ry + 24);
+        if (dx * dx + dy * dy <= 1) {
+          handleCapsuleCollected(i);
+          break;
+        }
+      }
+    }
+
+    function handleCapsuleCollected(capIdx) {
+      const cap = state.capsules[capIdx];
+      if (!cap || cap.collected) return;
+
+      state.canCollect = false;
+      cap.collected = true;
+      stopCountdownTimer();
+
+      const mission = oceanData.missions[state.missionIdx];
+      const q = mission.questions[state.questionIdx];
+      const isCorrect = capIdx === q.correctIndex;
+
+      if (isCorrect) {
+        state.missionScore += 100;
+        oceanAudio.playCorrectChime();
+        spawnCelebrationParticles(cap.x, cap.y, cap.theme);
+        spawnFloatingPopup(cap.x, cap.y - 20, "+100 POIN! 🌟", "#059669");
+        updateHud();
+
+        setTimeout(() => {
+          openFeedbackModal(true, q, capIdx);
+        }, 360);
+      } else {
+        state.lives = Math.max(0, state.lives - 1);
+        oceanAudio.playWrongGentle();
+        spawnFloatingPopup(cap.x, cap.y - 20, "-1 Nyawa 🫧", "#e11d48");
+        updateHud();
+
+        setTimeout(() => {
+          if (state.lives <= 0) {
+            handleMissionFailed(
+              "Nyawa Oksigen Habis!",
+              `Tetap semangat, ${state.playerName}! Jawaban yang benar tadi adalah "${CAPSULE_THEMES[q.correctIndex].letter}. ${q.options[q.correctIndex]}". Ayo coba lagi misi ini!`
+            );
+          } else {
+            openFeedbackModal(false, q, capIdx);
+          }
+        }, 360);
+      }
+    }
+
+    function openFeedbackModal(isCorrect, q, chosenIdx) {
+      state.screen = "feedback";
+      const correctLetter = CAPSULE_THEMES[q.correctIndex].letter;
+      const correctText = q.options[q.correctIndex];
+
+      const emoji = document.getElementById("fbEmoji");
+      const title = document.getElementById("fbTitle");
+      const subtitle = document.getElementById("fbSubtitle");
+      const explanation = document.getElementById("fbExplanation");
+      const btn = document.getElementById("fbContinueBtn");
+
+      if (isCorrect) {
+        emoji.textContent = "🌟";
+        title.textContent = `Hebat Sekali, ${state.playerName}!`;
+        title.className = "font-display text-2xl sm:text-3xl font-bold text-emerald-600 mb-1";
+        subtitle.textContent = `Kamu mengumpulkan jawaban benar (${correctLetter}. ${correctText})! +100 Poin!`;
+      } else {
+        const chosenLetter = CAPSULE_THEMES[chosenIdx].letter;
+        emoji.textContent = "🐡";
+        title.textContent = `Belum Tepat, ${state.playerName}!`;
+        title.className = "font-display text-2xl sm:text-3xl font-bold text-amber-600 mb-1";
+        subtitle.textContent = `Kapsul ${chosenLetter} belum tepat. Jawaban yang benar adalah ${correctLetter}. ${correctText}.`;
+      }
+
+      explanation.textContent = q.explanation;
+
+      const isLastQ = state.questionIdx >= oceanData.missions[state.missionIdx].questions.length - 1;
+      btn.textContent = isLastQ ? "Selesaikan Misi Ini 🏅" : "Lanjut Soal Berikutnya ➡️";
+
+      document.getElementById("feedbackModal").classList.remove("hidden");
+    }
+
+    function continueAfterFeedback() {
+      document.getElementById("feedbackModal").classList.add("hidden");
+      const mission = oceanData.missions[state.missionIdx];
+
+      if (state.questionIdx + 1 < mission.questions.length) {
+        state.questionIdx += 1;
+        state.screen = "playing";
+        loadQuestion();
+        startCountdownTimer();
+      } else {
+        completeCurrentMission();
+      }
+    }
+
+    function handleMissionFailed(titleText, bodyText) {
+      state.screen = "missionFail";
+      stopCountdownTimer();
+      oceanAudio.playWrongGentle();
+
+      document.getElementById("feedbackModal").classList.add("hidden");
+      document.getElementById("failTitle").textContent = titleText;
+      document.getElementById("failMessage").textContent = bodyText;
+      document.getElementById("missionFailModal").classList.remove("hidden");
+    }
+
+    function completeCurrentMission() {
+      if (state.missionScore >= progress.missionScores[state.missionIdx]) {
+        progress.missionScores[state.missionIdx] = state.missionScore;
+      }
+      if (state.missionIdx + 1 >= progress.unlockedMission && progress.unlockedMission < 5) {
+        progress.unlockedMission = state.missionIdx + 2;
+      }
+      saveOceanProgress();
+
+      const totalScore = progress.missionScores.reduce((a, b) => a + b, 0);
+
+      // Jika Misi ke-5 selesai -> Tampilkan Halaman Hasil Akhir & Apresiasi Personal!
+      if (state.missionIdx === 4) {
+        showFinalVictoryScreen(totalScore);
+        return;
+      }
+
+      state.screen = "missionClear";
+      oceanAudio.playVictoryFanfare();
+
+      const mNum = state.missionIdx + 1;
+      document.getElementById("clearTitle").textContent = `Misi ${mNum} Berhasil!`;
+      document.getElementById("clearSubtitle").textContent =
+        `Luar biasa, ${state.playerName}! Misi ${mNum + 1} (${oceanData.missions[mNum].title}) sekarang sudah terbuka!`;
+      document.getElementById("clearMissionScore").textContent = `${state.missionScore} / 300`;
+      document.getElementById("clearTotalScore").textContent = totalScore;
+
+      document.getElementById("missionClearModal").classList.remove("hidden");
+    }
+
+    function showFinalVictoryScreen(totalScore) {
+      state.screen = "victory";
+      state.oceanSavedGlow = 1;
+      oceanAudio.playVictoryFanfare();
+
+      document.getElementById("gameHud").classList.add("hidden");
+      document.getElementById("missionClearModal").classList.add("hidden");
+
+      document.getElementById("finalHeroTitle").textContent =
+        `Hebat Sekali, ${state.playerName}!`;
+      document.getElementById("finalHeroMessage").textContent =
+        `Kamu Adalah Pahlawan Penyelamat Lautan! Berkat kecerdasan dan kepedulianmu, seluruh 5 wilayah samudra kembali bersih, terumbu karang bersinar, dan biota laut hidup bahagia!`;
+      document.getElementById("finalScoreValue").textContent = totalScore;
+
+      if (totalScore >= 1300) {
+        document.getElementById("finalBadgeIcon").textContent = "👑";
+        document.getElementById("finalBadgeName").textContent = "Laksamana Samudra";
+      } else if (totalScore >= 900) {
+        document.getElementById("finalBadgeIcon").textContent = "🔱";
+        document.getElementById("finalBadgeName").textContent = "Penjaga Terumbu";
+      } else {
+        document.getElementById("finalBadgeIcon").textContent = "🐬";
+        document.getElementById("finalBadgeName").textContent = "Sahabat Lautan";
+      }
+
+      const summary = document.getElementById("finalMissionSummary");
+      summary.innerHTML = "";
+      oceanData.missions.forEach((m, idx) => {
+        const sc = progress.missionScores[idx] || 0;
+        const stars = sc === 300 ? "⭐⭐⭐" : sc >= 200 ? "⭐⭐" : sc >= 100 ? "⭐" : "🐚";
+        const card = document.createElement("div");
+        card.className = "bg-white/95 border-2 border-sky-200 rounded-xl p-2 text-center";
+        card.innerHTML = `
+          <div class="text-[10px] font-extrabold text-sky-700">MISI ${m.id}</div>
+          <div class="text-xs sm:text-sm my-0.5">${stars}</div>
+          <div class="font-display font-bold text-xs sm:text-sm text-slate-800">${sc}</div>
+        `;
+        summary.appendChild(card);
+      });
+
+      // Kembang api gelembung & bintang bawah laut
+      for (let i = 0; i < 6; i++) {
+        setTimeout(() => {
+          spawnCelebrationParticles(width * (0.18 + i * 0.13), height * 0.35, CAPSULE_THEMES[i % 4]);
+        }, i * 180);
+      }
+
+      document.getElementById("finalVictoryScreen").classList.remove("hidden");
+    }
+
+    function returnToStartScreen() {
+      stopCountdownTimer();
+      state.screen = "start";
+      document.getElementById("gameHud").classList.add("hidden");
+      document.getElementById("feedbackModal").classList.add("hidden");
+      document.getElementById("missionClearModal").classList.add("hidden");
+      document.getElementById("missionFailModal").classList.add("hidden");
+      document.getElementById("finalVictoryScreen").classList.add("hidden");
+      renderStartScreen();
+      document.getElementById("startScreen").classList.remove("hidden");
+    }
+
+    function renderStartScreen() {
+      document.getElementById("metaMapelText").textContent = oceanData.meta.mataPelajaran;
+      document.getElementById("metaKelasText").textContent = oceanData.meta.kelas;
+      document.getElementById("metaMateriText").textContent = `Materi: ${oceanData.meta.materi}`;
+      document.getElementById("studentNameInput").value = state.playerName;
+
+      const totalScore = progress.missionScores.reduce((a, b) => a + b, 0);
+      document.getElementById("startTotalScore").textContent = totalScore;
+
+      const grid = document.getElementById("missionCardsGrid");
+      grid.innerHTML = "";
+
+      oceanData.missions.forEach((m, idx) => {
+        const unlocked = m.id <= progress.unlockedMission;
+        const sc = progress.missionScores[idx] || 0;
+        const completed = sc > 0 || m.id < progress.unlockedMission;
+
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.disabled = !unlocked;
+
+        if (unlocked) {
+          btn.className = `btn-arcade text-left p-3 rounded-2xl border-2 flex items-center justify-between gap-2 ${
+            completed
+              ? "bg-white border-emerald-400 shadow-sm"
+              : "bg-gradient-to-r from-sky-100 to-white border-sky-400 shadow-md"
+          }`;
+          btn.innerHTML = `
+            <div class="min-w-0">
+              <div class="flex items-center gap-1.5">
+                <span class="px-2 py-0.5 rounded-lg text-[11px] font-extrabold ${
+                  completed ? "bg-emerald-600 text-white" : "bg-sky-600 text-white"
+                }">Misi ${m.id}</span>
+                <span class="text-xs font-extrabold text-slate-500">${sc}/300 pts</span>
+              </div>
+              <div class="font-display font-bold text-sm text-slate-800 truncate mt-1">${m.title}</div>
+            </div>
+            <div class="text-xl shrink-0">${completed ? "🏅" : "🤿"}</div>
+          `;
+          btn.addEventListener("click", () => startMission(idx));
+        } else {
+          btn.className = "text-left p-3 rounded-2xl border-2 border-slate-200 bg-slate-100/85 opacity-75 flex items-center justify-between gap-2 cursor-not-allowed";
+          btn.innerHTML = `
+            <div class="min-w-0">
+              <div class="flex items-center gap-1.5">
+                <span class="px-2 py-0.5 rounded-lg text-[11px] font-extrabold bg-slate-400 text-white">Misi ${m.id}</span>
+                <span class="text-[11px] font-bold text-slate-500">Terkunci</span>
+              </div>
+              <div class="font-display font-bold text-sm text-slate-500 truncate mt-1">${m.title}</div>
+            </div>
+            <div class="text-xl shrink-0">🔒</div>
+          `;
+        }
+
+        grid.appendChild(btn);
+      });
+
+      const nextIdx = Math.min(progress.unlockedMission - 1, 4);
+      document.getElementById("startAdventureBtnLabel").textContent =
+        `Mulai Petualangan! (Misi ${nextIdx + 1})`;
+    }
+
+    /*************************************************************************
+     * 7. INTEGRASI MEDIAPIPE HANDS (DETEKSI TELAPAK TANGAN / PALM CENTER)
+     *    - Kamera hanya diaktifkan secara manual oleh pengguna!
+     *************************************************************************/
+    const videoEl = document.getElementById("webcamVideo");
+    const palmCanvas = document.getElementById("palmOverlayCanvas");
+    const palmCtx = palmCanvas.getContext("2d");
+
+    async function toggleCameraGesture() {
+      if (state.cameraActive) {
+        stopCameraGesture();
+      } else {
+        await startCameraGesture();
+      }
+    }
+
+    function stopCameraGesture() {
+      state.cameraActive = false;
+      state.cameraStarting = false;
+      state.palmDetected = false;
+
+      if (state.cameraUtilsInstance && typeof state.cameraUtilsInstance.stop === "function") {
+        try {
+          state.cameraUtilsInstance.stop();
+        } catch (e) {
+          console.warn(e);
+        }
+        state.cameraUtilsInstance = null;
+      }
+
+      if (state.mediaStream) {
+        state.mediaStream.getTracks().forEach((t) => t.stop());
+        state.mediaStream = null;
+      }
+
+      document.getElementById("cameraPipWidget").classList.add("hidden");
+      updateCameraStatusUi();
+      showToast("Kamera gesture dimatikan. Kontrol mouse/sentuh tetap aktif.", "info");
+    }
+
+    async function startCameraGesture() {
+      if (state.cameraActive || state.cameraStarting) return;
+
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        showToast("Browser tidak mendukung kamera. Gunakan mouse atau layar sentuh.", "warning");
+        return;
+      }
+
+      if (typeof Hands === "undefined") {
+        showToast("Sensor tangan MediaPipe belum siap. Gunakan mouse/sentuh atau muat ulang.", "warning");
+        return;
+      }
+
+      state.cameraStarting = true;
+      updateCameraStatusUi();
+      showToast("Mengaktifkan kamera & sensor telapak tangan...", "info");
+
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user" },
+          audio: false
+        });
+        state.mediaStream = stream;
+        videoEl.srcObject = stream;
+        await videoEl.play();
+
+        if (!state.handsDetector) {
+          state.handsDetector = new Hands({
+            locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+          });
+          state.handsDetector.setOptions({
+            maxNumHands: 1,
+            modelComplexity: 1,
+            minDetectionConfidence: 0.65,
+            minTrackingConfidence: 0.6
+          });
+          state.handsDetector.onResults(onPalmHandResults);
+        }
+
+        state.cameraActive = true;
+        state.cameraStarting = false;
+        document.getElementById("cameraPipWidget").classList.remove("hidden");
+        updateCameraStatusUi();
+        showToast("Kamera Gesture Aktif! Gerakkan telapak tangan untuk mengarahkan penyelam ✋", "success");
+
+        // Loop pemrosesan frame yang stabil di Chrome & Edge
+        runPalmDetectionLoop();
+      } catch (err) {
+        console.warn("Akses kamera gagal:", err);
+        state.cameraActive = false;
+        state.cameraStarting = false;
+        updateCameraStatusUi();
+        showToast("Izin kamera tidak aktif. Gunakan mouse atau sentuhan untuk berenang!", "warning");
+      }
+    }
+
+    let processingFrame = false;
+    async function runPalmDetectionLoop() {
+      if (!state.cameraActive) return;
+      if (videoEl.readyState >= 2 && !processingFrame && state.handsDetector) {
+        processingFrame = true;
+        try {
+          await state.handsDetector.send({ image: videoEl });
+        } catch (e) {
+          console.warn("Kesalahan deteksi tangan:", e);
+        } finally {
+          processingFrame = false;
+        }
+      }
+      requestAnimationFrame(runPalmDetectionLoop);
+    }
+
+    function onPalmHandResults(results) {
+      if (!state.cameraActive) return;
+
+      const cw = (palmCanvas.width = 240);
+      const ch = (palmCanvas.height = 180);
+
+      // Gambar video mirror pada mini PIP
+      palmCtx.save();
+      palmCtx.clearRect(0, 0, cw, ch);
+      palmCtx.translate(cw, 0);
+      palmCtx.scale(-1, 1);
+      palmCtx.drawImage(results.image, 0, 0, cw, ch);
+      palmCtx.restore();
+
+      const badge = document.getElementById("palmStatusBadge");
+
+      if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+        state.palmDetected = true;
+        const lm = results.multiHandLandmarks[0];
+
+        // Hitung posisi tengah telapak tangan (Palm Center) dari landmark 0, 5, 9, 13, 17
+        const palmIndices = [0, 5, 9, 13, 17];
+        let sumX = 0;
+        let sumY = 0;
+        palmIndices.forEach((idx) => {
+          sumX += lm[idx].x;
+          sumY += lm[idx].y;
+        });
+        const rawPalmX = sumX / palmIndices.length;
+        const rawPalmY = sumY / palmIndices.length;
+
+        // Gambar kerangka tangan & titik pusat telapak tangan di PIP
+        drawPalmSkeletonPip(palmCtx, lm, rawPalmX, rawPalmY, cw, ch);
+
+        // Mirror horizontal (1 - x) dengan margin tepi 10% agar sudut layar mudah dijangkau siswa
+        const mirroredX = 1 - rawPalmX;
+        const normX = Math.min(1, Math.max(0, (mirroredX - 0.1) / 0.8));
+        const normY = Math.min(1, Math.max(0, (rawPalmY - 0.1) / 0.8));
+
+        state.diver.targetX = normX * width;
+        state.diver.targetY = normY * height;
+
+        badge.textContent = "Telapak Tangan Aktif 🤿";
+        badge.className = "absolute bottom-1.5 left-1.5 right-1.5 px-2 py-0.5 rounded-lg bg-emerald-600 text-white text-[10px] sm:text-xs font-extrabold text-center";
+      } else {
+        state.palmDetected = false;
+        badge.textContent = "Tunjukkan Telapak Tangan ✋";
+        badge.className = "absolute bottom-1.5 left-1.5 right-1.5 px-2 py-0.5 rounded-lg bg-slate-900/80 text-white text-[10px] sm:text-xs font-bold text-center";
+      }
+    }
+
+    function drawPalmSkeletonPip(c, lm, palmX, palmY, cw, ch) {
+      const links = [
+        [0, 1], [1, 2], [2, 3], [3, 4],
+        [0, 5], [5, 6], [6, 7], [7, 8],
+        [5, 9], [9, 10], [10, 11], [11, 12],
+        [9, 13], [13, 14], [14, 15], [15, 16],
+        [13, 17], [17, 18], [18, 19], [19, 20], [0, 17]
+      ];
+      c.strokeStyle = "#38bdf8";
+      c.lineWidth = 2;
+      links.forEach(([a, b]) => {
+        c.beginPath();
+        c.moveTo((1 - lm[a].x) * cw, lm[a].y * ch);
+        c.lineTo((1 - lm[b].x) * cw, lm[b].y * ch);
+        c.stroke();
+      });
+
+      // Titik pusat telapak tangan bersinar
+      const px = (1 - palmX) * cw;
+      const py = palmY * ch;
+      c.fillStyle = "rgba(250, 204, 21, 0.45)";
+      c.beginPath();
+      c.arc(px, py, 14, 0, Math.PI * 2);
+      c.fill();
+
+      c.fillStyle = "#facc15";
+      c.beginPath();
+      c.arc(px, py, 6, 0, Math.PI * 2);
+      c.fill();
+      c.strokeStyle = "#ffffff";
+      c.lineWidth = 2;
+      c.stroke();
+    }
+
+    function updateCameraStatusUi() {
+      const startBadge = document.getElementById("startCamBadge");
+      const startText = document.getElementById("startCamBtnText");
+      const hudLabel = document.getElementById("hudCamLabel");
+      const hudBtn = document.getElementById("hudCamBtn");
+
+      if (state.cameraStarting) {
+        startBadge.textContent = "Memuat...";
+        startBadge.className = "px-2 py-0.5 rounded-full text-[11px] font-extrabold bg-amber-200 text-amber-900";
+        startText.textContent = "Menghubungkan Kamera...";
+      } else if (state.cameraActive) {
+        startBadge.textContent = "ON ✓";
+        startBadge.className = "px-2 py-0.5 rounded-full text-[11px] font-extrabold bg-emerald-200 text-emerald-900";
+        startText.textContent = "Matikan Kamera Gesture";
+        hudLabel.textContent = "Kamera ON";
+        hudBtn.className = "btn-arcade px-2.5 py-1.5 rounded-xl bg-emerald-100 border-2 border-emerald-400 text-emerald-800 text-xs sm:text-sm font-bold flex items-center gap-1";
+      } else {
+        startBadge.textContent = "OFF";
+        startBadge.className = "px-2 py-0.5 rounded-full text-[11px] font-extrabold bg-slate-200 text-slate-700";
+        startText.textContent = "Aktifkan Kamera Gesture";
+        hudLabel.textContent = "Kamera OFF";
+        hudBtn.className = "btn-arcade px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 border-2 border-slate-300 text-slate-700 text-xs sm:text-sm font-bold flex items-center gap-1";
+      }
+    }
+
+    /*************************************************************************
+     * 8. ALTERNATIF KONTROL MOUSE & TOUCHSCREEN (SELALU AKTIF)
+     *************************************************************************/
+    canvas.addEventListener("pointermove", (e) => {
+      state.diver.targetX = e.clientX;
+      state.diver.targetY = e.clientY;
+    });
+
+    canvas.addEventListener("pointerdown", (e) => {
+      oceanAudio.init();
+      state.diver.targetX = e.clientX;
+      state.diver.targetY = e.clientY;
+    });
+
+    /*************************************************************************
+     * 9. UPDATE SIMULASI & RENDERING DUNIA BAWAH LAUT 3D-STYLE (60 FPS)
+     *************************************************************************/
+    let prevTime = performance.now();
+
+    function mainLoop(now) {
+      const dt = Math.min(0.05, (now - prevTime) / 1000);
+      prevTime = now;
+
+      updateWorld(dt, now / 1000);
+      renderWorld(now / 1000);
+
+      requestAnimationFrame(mainLoop);
+    }
+
+    function updateWorld(dt, timeSec) {
+      // 1. Update Grace Period
+      if (state.screen === "playing" && state.graceTimer > 0) {
+        const wasGrace = state.graceTimer > 0;
+        state.graceTimer = Math.max(0, state.graceTimer - dt);
+        if (wasGrace && state.graceTimer === 0) {
+          updateHud();
+        }
+      }
+
+      // 2. Smooth interpolation gerakan penyelam mengikuti telapak tangan / mouse / touch
+      const prevX = state.diver.x;
+      const prevY = state.diver.y;
+      const clampedTargetY = Math.min(height - 54, Math.max(120, state.diver.targetY));
+      const clampedTargetX = Math.min(width - 44, Math.max(44, state.diver.targetX));
+
+      const lerpFactor = 1 - Math.pow(0.0008, dt);
+      state.diver.x += (clampedTargetX - state.diver.x) * lerpFactor;
+      state.diver.y += (clampedTargetY - state.diver.y) * lerpFactor;
+
+      state.diver.vx = (state.diver.x - prevX) / Math.max(0.001, dt);
+      state.diver.vy = (state.diver.y - prevY) / Math.max(0.001, dt);
+
+      if (Math.abs(state.diver.vx) > 12) {
+        state.diver.facing = state.diver.vx >= 0 ? 1 : -1;
+      }
+
+      const speed = Math.hypot(state.diver.vx, state.diver.vy);
+      state.diver.kickPhase += dt * (5 + Math.min(14, speed * 0.03));
+
+      // Gelembung keluar dari tabung oksigen penyelam saat bergerak
+      state.diver.bubbleTimer += dt;
+      if (state.diver.bubbleTimer > (speed > 60 ? 0.14 : 0.36)) {
+        state.diver.bubbleTimer = 0;
+        state.ambientBubbles.push({
+          x: state.diver.x - state.diver.facing * 18,
+          y: state.diver.y - 12,
+          r: 2.5 + Math.random() * 4,
+          speed: 45 + Math.random() * 35,
+          wobble: Math.random() * Math.PI * 2
+        });
+        if (speed > 180 && Math.random() < 0.35) {
+          oceanAudio.playBubble();
+        }
+      }
+
+      // 3. Gelembung air naik
+      for (let i = state.ambientBubbles.length - 1; i >= 0; i--) {
+        const b = state.ambientBubbles[i];
+        b.y -= b.speed * dt;
+        b.x += Math.sin(timeSec * 3 + b.wobble) * 14 * dt;
+        if (b.y < -15) {
+          if (state.ambientBubbles.length > 28) {
+            state.ambientBubbles.splice(i, 1);
+          } else {
+            b.y = height + 10;
+            b.x = Math.random() * width;
+          }
+        }
+      }
+
+      // 4. Ikan-ikan & biota laut berenang
+      state.fishes.forEach((f, idx) => {
+        f.x += f.vx * dt;
+        if (f.vx > 0 && f.x > width + 80) {
+          f.x = -80;
+          f.y = height * (0.24 + ((idx * 0.13) % 0.56));
+        } else if (f.vx < 0 && f.x < -80) {
+          f.x = width + 80;
+          f.y = height * (0.24 + ((idx * 0.13) % 0.56));
+        }
+      });
+
+      // 5. Kapsul jawaban melayang lembut & cek tabrakan dengan penyelam
+      if (state.screen === "playing") {
+        state.capsules.forEach((cap) => {
+          if (cap.collected) return;
+          cap.scale += (1 - cap.scale) * Math.min(1, dt * 8);
+          const bobX = Math.cos(timeSec * 1.4 + cap.phase) * 9;
+          const bobY = Math.sin(timeSec * 2.0 + cap.phase) * 10;
+          cap.x += (cap.anchorX + bobX - cap.x) * Math.min(1, dt * 7);
+          cap.y += (cap.anchorY + bobY - cap.y) * Math.min(1, dt * 7);
+        });
+
+        checkDiverCapsuleCollision();
+      }
+
+      // 6. Partikel perayaan & teks melayang
+      for (let i = state.particles.length - 1; i >= 0; i--) {
+        const p = state.particles[i];
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        p.vy += 260 * dt;
+        p.rot += p.vRot * dt;
+        p.alpha -= dt * 1.15;
+        if (p.alpha <= 0) state.particles.splice(i, 1);
+      }
+
+      for (let i = state.floatingPopups.length - 1; i >= 0; i--) {
+        const fp = state.floatingPopups[i];
+        fp.y += fp.vy * dt;
+        fp.alpha -= dt * 0.9;
+        if (fp.alpha <= 0) state.floatingPopups.splice(i, 1);
+      }
+    }
+
+    function renderWorld(timeSec) {
+      const mission = oceanData.missions[state.missionIdx] || oceanData.missions[0];
+      const pal = mission.palette;
+
+      // 1. Gradien Kedalaman Air Laut 3D-style
+      const waterGrad = ctx.createLinearGradient(0, 0, 0, height);
+      waterGrad.addColorStop(0, pal.top);
+      waterGrad.addColorStop(0.55, pal.mid);
+      waterGrad.addColorStop(1, pal.bottom);
+      ctx.fillStyle = waterGrad;
+      ctx.fillRect(0, 0, width, height);
+
+      // 2. Sinar Matahari Bawah Laut (God Rays) bergerak lembut
+      drawGodRays(timeSec);
+
+      // 3. Terumbu Karang Latar Belakang (Siluet kedalaman 3D)
+      drawCoralLayer(height * 0.89, 0.55, true);
+
+      // 4. Dasar Pasir Samudra 3D-style & Peti Harta Karun Berkilau
+      drawOceanFloorAndTreasure(pal.sand, timeSec);
+
+      // 5. Rumput Laut Melambai Sinus
+      drawSeaweeds(timeSec);
+
+      // 6. Terumbu Karang Latar Depan Warna-Warni
+      drawCoralLayer(height * 0.94, 0.95, false);
+
+      // 7. Ikan Kartun, Penyu & Ubur-ubur
+      state.fishes.forEach((f) => drawMarineCreature(f, timeSec));
+
+      // 8. Gelembung Udara
+      drawAmbientBubbles();
+
+      // 9. Kapsul Jawaban Bawah Laut
+      if (state.screen === "playing" || state.screen === "feedback") {
+        state.capsules.forEach((cap) => {
+          if (!cap.collected) drawAnswerCapsule(cap, timeSec);
+        });
+      }
+
+      // 10. Karakter Penyelam (Diver) 3D-style
+      if (state.screen !== "start") {
+        drawDiverCharacter(timeSec);
+      }
+
+      // 11. Partikel Bintang & Popup Skor
+      drawParticlesAndPopups();
+    }
+
+    function drawGodRays(timeSec) {
+      ctx.save();
+      for (let i = 0; i < 5; i++) {
+        const baseX = width * (0.12 + i * 0.2) + Math.sin(timeSec * 0.5 + i) * 35;
+        const topW = 45 + i * 8;
+        const botW = 140 + i * 25;
+
+        const rayGrad = ctx.createLinearGradient(baseX, 0, baseX + 40, height * 0.85);
+        rayGrad.addColorStop(0, "rgba(255, 255, 255, 0.24)");
+        rayGrad.addColorStop(1, "rgba(255, 255, 255, 0)");
+
+        ctx.fillStyle = rayGrad;
+        ctx.beginPath();
+        ctx.moveTo(baseX - topW / 2, 0);
+        ctx.lineTo(baseX + topW / 2, 0);
+        ctx.lineTo(baseX + botW / 2 + 55, height * 0.85);
+        ctx.lineTo(baseX - botW / 2 + 55, height * 0.85);
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    function drawOceanFloorAndTreasure(sandColor, timeSec) {
+      // Bukit pasir belakang
+      ctx.fillStyle = "rgba(245, 158, 11, 0.45)";
+      ctx.beginPath();
+      ctx.moveTo(0, height);
+      ctx.quadraticCurveTo(width * 0.3, height * 0.86, width * 0.65, height * 0.91);
+      ctx.quadraticCurveTo(width * 0.85, height * 0.94, width, height * 0.88);
+      ctx.lineTo(width, height);
+      ctx.closePath();
+      ctx.fill();
+
+      // Dasar pasir utama
+      const floorGrad = ctx.createLinearGradient(0, height * 0.88, 0, height);
+      floorGrad.addColorStop(0, sandColor);
+      floorGrad.addColorStop(1, "#d97706");
+      ctx.fillStyle = floorGrad;
+      ctx.beginPath();
+      ctx.moveTo(0, height);
+      ctx.quadraticCurveTo(width * 0.45, height * 0.89, width, height * 0.92);
+      ctx.lineTo(width, height);
+      ctx.closePath();
+      ctx.fill();
+
+      // Peti Harta Karun Berkilau di sisi kanan bawah
+      const chestX = width * 0.88;
+      const chestY = height * 0.91;
+      ctx.save();
+      ctx.translate(chestX, chestY);
+
+      // Cahaya emas harta karun
+      const shimmer = 0.55 + Math.sin(timeSec * 4) * 0.25;
+      const glow = ctx.createRadialGradient(0, -14, 4, 0, -14, 52);
+      glow.addColorStop(0, `rgba(253, 224, 71, ${shimmer})`);
+      glow.addColorStop(1, "rgba(253, 224, 71, 0)");
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(0, -14, 52, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Badan peti kayu
+      ctx.fillStyle = "#92400e";
+      ctx.beginPath();
+      ctx.roundRect(-24, -18, 48, 24, 5);
+      ctx.fill();
+      ctx.strokeStyle = "#fbbf24";
+      ctx.lineWidth = 3;
+      ctx.stroke();
+
+      // Tutup peti terbuka sedikit memperlihatkan emas & mutiara
+      ctx.fillStyle = "#fde047";
+      ctx.beginPath();
+      ctx.arc(-8, -18, 6, 0, Math.PI * 2);
+      ctx.arc(4, -19, 7, 0, Math.PI * 2);
+      ctx.arc(13, -17, 5, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = "#b45309";
+      ctx.beginPath();
+      ctx.roundRect(-25, -30, 50, 11, 5);
+      ctx.fill();
+      ctx.strokeStyle = "#fbbf24";
+      ctx.stroke();
+
+      ctx.restore();
+    }
+
+    function drawCoralLayer(baseY, alpha, isBackground) {
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      const positions = isBackground
+        ? [0.08, 0.28, 0.52, 0.74, 0.94]
+        : [0.04, 0.19, 0.42, 0.68, 0.81, 0.96];
+      const colors = isBackground
+        ? ["#0e7490", "#155e75", "#1e40af"]
+        : ["#fb7185", "#f97316", "#c084fc", "#facc15", "#f43f5e"];
+
+      positions.forEach((px, idx) => {
+        const x = width * px;
+        const color = colors[idx % colors.length];
+        ctx.fillStyle = color;
+
+        // Cabang koral bulat ramah anak
+        ctx.beginPath();
+        ctx.arc(x, baseY - 18, 18, 0, Math.PI * 2);
+        ctx.arc(x - 16, baseY - 10, 14, 0, Math.PI * 2);
+        ctx.arc(x + 16, baseY - 12, 15, 0, Math.PI * 2);
+        ctx.arc(x - 6, baseY - 30, 12, 0, Math.PI * 2);
+        ctx.arc(x + 10, baseY - 28, 11, 0, Math.PI * 2);
+        ctx.fill();
+      });
+      ctx.restore();
+    }
+
+    function drawSeaweeds(timeSec) {
+      state.seaweeds.forEach((sw) => {
+        ctx.save();
+        ctx.strokeStyle = sw.color;
+        ctx.lineWidth = 10;
+        ctx.lineCap = "round";
+        ctx.beginPath();
+        const startY = height * 0.94;
+        ctx.moveTo(sw.x, startY);
+
+        for (let s = 1; s <= sw.segments; s++) {
+          const t = s / sw.segments;
+          const wave = Math.sin(timeSec * 2.4 + sw.phase + s * 0.9) * (12 * t);
+          ctx.lineTo(sw.x + wave, startY - sw.height * t);
+        }
+        ctx.stroke();
+        ctx.restore();
+      });
+    }
+
+    function drawMarineCreature(f, timeSec) {
+      const dir = f.vx >= 0 ? 1 : -1;
+      const bob = Math.sin(timeSec * 2.5 + f.phase) * 8;
+
+      ctx.save();
+      ctx.translate(f.x, f.y + bob);
+      ctx.scale(dir * f.scale, f.scale);
+
+      if (f.type === "clownfish") {
+        // Ekor
+        ctx.fillStyle = "#f97316";
+        ctx.beginPath();
+        ctx.moveTo(-20, 0);
+        ctx.lineTo(-32, -10);
+        ctx.lineTo(-32, 10);
+        ctx.closePath();
+        ctx.fill();
+        // Badan oranye
+        ctx.fillStyle = "#fb923c";
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 22, 14, 0, 0, Math.PI * 2);
+        ctx.fill();
+        // Garis putih khas ikan badut
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(-6, -13, 5, 26);
+        ctx.fillRect(6, -11, 4, 22);
+        // Mata
+        ctx.fillStyle = "#0f172a";
+        ctx.beginPath();
+        ctx.arc(13, -3, 2.8, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (f.type === "bluefish") {
+        ctx.fillStyle = "#38bdf8";
+        ctx.beginPath();
+        ctx.moveTo(-18, 0);
+        ctx.lineTo(-30, -11);
+        ctx.lineTo(-30, 11);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = "#0ea5e9";
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 21, 13, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#fde047";
+        ctx.beginPath();
+        ctx.arc(12, -2, 3.2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#0f172a";
+        ctx.beginPath();
+        ctx.arc(13, -2, 1.8, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (f.type === "turtle") {
+        // Sirip penyu
+        ctx.fillStyle = "#34d399";
+        ctx.beginPath();
+        ctx.ellipse(6, 10, 12, 5, 0.4, 0, Math.PI * 2);
+        ctx.ellipse(-10, 9, 9, 4, -0.3, 0, Math.PI * 2);
+        ctx.fill();
+        // Kepala
+        ctx.beginPath();
+        ctx.arc(24, -2, 8, 0, Math.PI * 2);
+        ctx.fill();
+        // Tempurung 3D
+        ctx.fillStyle = "#059669";
+        ctx.beginPath();
+        ctx.arc(0, 0, 20, Math.PI, 0);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = "#a7f3d0";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        // Mata
+        ctx.fillStyle = "#0f172a";
+        ctx.beginPath();
+        ctx.arc(26, -4, 2, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        // Ubur-ubur ramah
+        ctx.fillStyle = "rgba(244, 114, 182, 0.78)";
+        ctx.beginPath();
+        ctx.arc(0, 0, 18, Math.PI, 0);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = "rgba(251, 207, 232, 0.85)";
+        ctx.lineWidth = 2.5;
+        for (let t = -10; t <= 10; t += 6) {
+          ctx.beginPath();
+          ctx.moveTo(t, 0);
+          ctx.quadraticCurveTo(t + Math.sin(timeSec * 5 + t) * 5, 12, t, 22);
+          ctx.stroke();
+        }
+      }
+
+      ctx.restore();
+    }
+
+    function drawAmbientBubbles() {
+      state.ambientBubbles.forEach((b) => {
+        ctx.save();
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.7)";
+        ctx.fillStyle = "rgba(255, 255, 255, 0.22)";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        // Kilau gelembung
+        ctx.fillStyle = "rgba(255, 255, 255, 0.85)";
+        ctx.beginPath();
+        ctx.arc(b.x - b.r * 0.32, b.y - b.r * 0.32, b.r * 0.25, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      });
+    }
+
+    function drawAnswerCapsule(cap, timeSec) {
+      const pulse = 1 + Math.sin(timeSec * 3.5 + cap.phase) * 0.025;
+      const totalScale = cap.scale * pulse;
+
+      ctx.save();
+      ctx.translate(cap.x, cap.y);
+      ctx.scale(totalScale, totalScale);
+
+      // 1. Aura bercahaya di sekitar kapsul mutiara
+      const aura = ctx.createRadialGradient(0, 0, cap.rx * 0.3, 0, 0, cap.rx + 22);
+      aura.addColorStop(0, cap.theme.glow);
+      aura.addColorStop(1, "rgba(255, 255, 255, 0)");
+      ctx.fillStyle = aura;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, cap.rx + 22, cap.ry + 22, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 2. Indikator cincin Grace Period jika soal baru saja muncul
+      if (state.graceTimer > 0) {
+        const readyRatio = 1 - state.graceTimer / GRACE_PERIOD_DURATION;
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.85)";
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, cap.rx + 8, cap.ry + 8, 0, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * readyRatio);
+        ctx.stroke();
+      }
+
+      // 3. Kapsul Gelembung Mutiara 3D-style
+      const grad = ctx.createRadialGradient(-cap.rx * 0.3, -cap.ry * 0.35, 10, 0, 0, Math.max(cap.rx, cap.ry));
+      grad.addColorStop(0, cap.theme.shellTop);
+      grad.addColorStop(1, cap.theme.shellBottom);
+
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, cap.rx, cap.ry, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.lineWidth = 3.5;
+      ctx.strokeStyle = "#ffffff";
+      ctx.stroke();
+
+      // Kilau kaca kapsul
+      ctx.fillStyle = "rgba(255, 255, 255, 0.34)";
+      ctx.beginPath();
+      ctx.ellipse(-cap.rx * 0.5, -cap.ry * 0.4, cap.rx * 0.16, cap.ry * 0.25, -0.4, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 4. Lencana Huruf (A / B / C / D) di bagian atas kapsul
+      const badgeY = -cap.ry + 2;
+      ctx.fillStyle = "#ffffff";
+      ctx.beginPath();
+      ctx.arc(0, badgeY, 18, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = cap.theme.shellBottom;
+      ctx.stroke();
+
+      ctx.fillStyle = cap.theme.shellBottom;
+      ctx.font = "900 16px 'Fredoka', sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(cap.letter, 0, badgeY + 1);
+
+      // 5. Kartu Teks Pilihan Jawaban Kontras Tinggi di Tengah Kapsul
+      const boxW = cap.rx * 1.72;
+      const boxH = cap.ry * 1.15;
+      ctx.fillStyle = "rgba(255, 255, 255, 0.96)";
+      ctx.beginPath();
+      ctx.roundRect(-boxW / 2, -boxH / 2 + 8, boxW, boxH, 16);
+      ctx.fill();
+
+      const fontSize = width < 740 ? 12 : 14;
+      ctx.fillStyle = "#0f172a";
+      ctx.font = `800 ${fontSize}px 'Nunito', sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      drawWrappedText(ctx, cap.text, 0, 9, boxW - 16, fontSize * 1.24);
+
+      ctx.restore();
+    }
+
+    function drawWrappedText(c, text, x, y, maxW, lineH) {
+      const words = text.split(" ");
+      const lines = [];
+      let line = words[0] || "";
+
+      for (let i = 1; i < words.length; i++) {
+        const test = line + " " + words[i];
+        if (c.measureText(test).width <= maxW) {
+          line = test;
+        } else {
+          lines.push(line);
+          line = words[i];
+        }
+      }
+      lines.push(line);
+
+      const totalH = lines.length * lineH;
+      const startY = y - totalH / 2 + lineH / 2;
+      lines.forEach((l, idx) => {
+        c.fillText(l, x, startY + idx * lineH);
+      });
+    }
+
+    function drawDiverCharacter(timeSec) {
+      const d = state.diver;
+      const tilt = Math.max(-0.28, Math.min(0.28, d.vy * 0.0005)) * d.facing;
+      const kick = Math.sin(d.kickPhase) * 0.38;
+
+      ctx.save();
+      ctx.translate(d.x, d.y);
+      ctx.scale(d.facing, 1);
+      ctx.rotate(tilt);
+
+      // 1. Sorotan lampu senter kepala lembut ke depan
+      const beam = ctx.createLinearGradient(24, -14, 155, 10);
+      beam.addColorStop(0, "rgba(254, 240, 138, 0.42)");
+      beam.addColorStop(1, "rgba(254, 240, 138, 0)");
+      ctx.fillStyle = beam;
+      ctx.beginPath();
+      ctx.moveTo(22, -18);
+      ctx.lineTo(155, -52);
+      ctx.lineTo(155, 36);
+      ctx.lineTo(22, -8);
+      ctx.closePath();
+      ctx.fill();
+
+      // 2. Sirip kaki mengayuh (flippers)
+      ctx.save();
+      ctx.translate(-34, 6);
+      ctx.rotate(kick);
+      ctx.fillStyle = "#facc15";
+      ctx.beginPath();
+      ctx.moveTo(0, -4);
+      ctx.lineTo(-24, -10);
+      ctx.lineTo(-22, 4);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+
+      ctx.save();
+      ctx.translate(-34, 12);
+      ctx.rotate(-kick);
+      ctx.fillStyle = "#eab308";
+      ctx.beginPath();
+      ctx.moveTo(0, -3);
+      ctx.lineTo(-24, 4);
+      ctx.lineTo(-20, 14);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+
+      // 3. Tabung Oksigen 3D di punggung
+      ctx.fillStyle = "#f97316";
+      ctx.beginPath();
+      ctx.roundRect(-24, -22, 30, 13, 6);
+      ctx.fill();
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // 4. Baju Selam Kartun (Biru & Kuning Cerah)
+      ctx.fillStyle = "#0284c7";
+      ctx.beginPath();
+      ctx.roundRect(-34, -8, 44, 24, 12);
+      ctx.fill();
+      ctx.strokeStyle = "#38bdf8";
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+
+      // Sabuk kuning
+      ctx.fillStyle = "#facc15";
+      ctx.fillRect(-14, -8, 6, 24);
+
+      // 5. Helm / Kepala Penyelam & Kacamata Selam Mengkilap
+      ctx.fillStyle = "#fde68a"; // Wajah ramah
+      ctx.beginPath();
+      ctx.arc(16, -6, 17, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Topi selam biru
+      ctx.fillStyle = "#0369a1";
+      ctx.beginPath();
+      ctx.arc(14, -7, 17.5, Math.PI * 0.85, Math.PI * 1.95);
+      ctx.fill();
+
+      // Kacamata selam 3D-style
+      ctx.fillStyle = "#e0f2fe";
+      ctx.beginPath();
+      ctx.roundRect(14, -14, 16, 12, 5);
+      ctx.fill();
+      ctx.strokeStyle = "#facc15";
+      ctx.lineWidth = 3;
+      ctx.stroke();
+
+      // Mata ceria di balik kaca
+      ctx.fillStyle = "#0f172a";
+      ctx.beginPath();
+      ctx.arc(23, -8, 2.6, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Senter kepala kecil
+      ctx.fillStyle = "#ef4444";
+      ctx.beginPath();
+      ctx.roundRect(15, -24, 10, 6, 3);
+      ctx.fill();
+
+      // 6. Cincin Aura Penyelam agar posisi selalu jelas di layar
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.45)";
+      ctx.lineWidth = 2;
+      ctx.setLineDash([6, 6]);
+      ctx.beginPath();
+      ctx.arc(0, 0, 44, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.restore();
+    }
+
+    function drawParticlesAndPopups() {
+      state.particles.forEach((p) => {
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, p.alpha);
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.rot);
+        ctx.fillStyle = p.color;
+        if (p.kind === "star") {
+          drawStar(ctx, 0, 0, 5, p.size, p.size * 0.45);
+          ctx.fill();
+        } else {
+          ctx.beginPath();
+          ctx.arc(0, 0, p.size * 0.65, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.restore();
+      });
+
+      state.floatingPopups.forEach((fp) => {
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, fp.alpha);
+        ctx.font = "700 24px 'Fredoka', sans-serif";
+        ctx.textAlign = "center";
+        ctx.lineWidth = 5;
+        ctx.strokeStyle = "#ffffff";
+        ctx.strokeText(fp.text, fp.x, fp.y);
+        ctx.fillStyle = fp.color;
+        ctx.fillText(fp.text, fp.x, fp.y);
+        ctx.restore();
+      });
+    }
+
+    function drawStar(c, cx, cy, spikes, outerR, innerR) {
+      let rot = (Math.PI / 2) * 3;
+      const step = Math.PI / spikes;
+      c.beginPath();
+      c.moveTo(cx, cy - outerR);
+      for (let i = 0; i < spikes; i++) {
+        c.lineTo(cx + Math.cos(rot) * outerR, cy + Math.sin(rot) * outerR);
+        rot += step;
+        c.lineTo(cx + Math.cos(rot) * innerR, cy + Math.sin(rot) * innerR);
+        rot += step;
+      }
+      c.closePath();
+    }
+
+    /*************************************************************************
+     * 10. MODE GURU (EDITOR IDENTITAS & 15 SOAL LOTS / MOTS / HOTS)
+     *************************************************************************/
+    let draftData = null;
+    let activeTeacherMissionIdx = 0;
+
+    function openTeacherEditor() {
+      draftData = JSON.parse(JSON.stringify(oceanData));
+      activeTeacherMissionIdx = 0;
+
+      document.getElementById("tMapelInput").value = draftData.meta.mataPelajaran;
+      document.getElementById("tMateriInput").value = draftData.meta.materi;
+      document.getElementById("tKelasInput").value = draftData.meta.kelas;
+
+      renderTeacherTabs();
+      renderTeacherQuestions();
+      document.getElementById("teacherModal").classList.remove("hidden");
+    }
+
+    function syncCurrentMissionDraft() {
+      if (!draftData) return;
+      const m = draftData.missions[activeTeacherMissionIdx];
+      m.title = document.getElementById("tMissionTitleInput").value.trim() || m.title;
+
+      m.questions.forEach((q, qIdx) => {
+        const qEl = document.getElementById(`tq_${qIdx}`);
+        const expEl = document.getElementById(`texp_${qIdx}`);
+        const ansEl = document.getElementById(`tans_${qIdx}`);
+
+        if (qEl) q.question = qEl.value.trim() || q.question;
+        if (expEl) q.explanation = expEl.value.trim() || q.explanation;
+        if (ansEl) q.correctIndex = parseInt(ansEl.value, 10) || 0;
+
+        for (let o = 0; o < 4; o++) {
+          const optEl = document.getElementById(`topt_${qIdx}_${o}`);
+          if (optEl) q.options[o] = optEl.value.trim() || q.options[o];
+        }
+      });
+    }
+
+    function renderTeacherTabs() {
+      const container = document.getElementById("tMissionTabs");
+      container.innerHTML = "";
+      draftData.missions.forEach((m, idx) => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = `px-3 py-1.5 rounded-xl font-bold text-xs border-2 transition ${
+          idx === activeTeacherMissionIdx
+            ? "bg-purple-700 text-white border-purple-800"
+            : "bg-white text-slate-700 border-slate-300 hover:bg-purple-50"
+        }`;
+        btn.textContent = `Misi ${m.id}`;
+        btn.addEventListener("click", () => {
+          syncCurrentMissionDraft();
+          activeTeacherMissionIdx = idx;
+          renderTeacherTabs();
+          renderTeacherQuestions();
+        });
+        container.appendChild(btn);
+      });
+    }
+
+    function renderTeacherQuestions() {
+      const m = draftData.missions[activeTeacherMissionIdx];
+      document.getElementById("tMissionTitleInput").value = m.title;
+
+      const list = document.getElementById("tQuestionsList");
+      list.innerHTML = "";
+
+      m.questions.forEach((q, qIdx) => {
+        const card = document.createElement("div");
+        card.className = "bg-slate-50 border-2 border-slate-200 rounded-2xl p-3.5 space-y-2.5";
+        card.innerHTML = `
+          <div class="flex items-center justify-between">
+            <span class="font-display font-bold text-sm text-purple-800">Pertanyaan ${qIdx + 1} (${q.level})</span>
+            <div class="flex items-center gap-1.5">
+              <label class="text-xs font-extrabold text-slate-600">Kunci Jawaban:</label>
+              <select id="tans_${qIdx}" class="px-2 py-1 rounded-lg border-2 border-emerald-300 bg-emerald-50 text-xs font-extrabold text-emerald-900">
+                <option value="0" ${q.correctIndex === 0 ? "selected" : ""}>Pilihan A</option>
+                <option value="1" ${q.correctIndex === 1 ? "selected" : ""}>Pilihan B</option>
+                <option value="2" ${q.correctIndex === 2 ? "selected" : ""}>Pilihan C</option>
+                <option value="3" ${q.correctIndex === 3 ? "selected" : ""}>Pilihan D</option>
+              </select>
+            </div>
+          </div>
+          <textarea id="tq_${qIdx}" rows="2" class="w-full px-3 py-2 rounded-xl border-2 border-slate-200 text-xs sm:text-sm font-bold text-slate-800">${q.question}</textarea>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            ${["A", "B", "C", "D"]
+              .map(
+                (ltr, oIdx) => `
+              <div class="flex items-center gap-1.5">
+                <span class="w-6 h-6 rounded-lg bg-sky-100 flex items-center justify-center font-extrabold text-xs text-sky-800 shrink-0">${ltr}</span>
+                <input id="topt_${qIdx}_${oIdx}" type="text" value="${q.options[oIdx].replace(/"/g, "&quot;")}" class="w-full px-2.5 py-1.5 rounded-xl border-2 border-slate-200 text-xs font-bold text-slate-800" />
+              </div>`
+              )
+              .join("")}
+          </div>
+          <div>
+            <label class="block text-[11px] font-extrabold text-amber-800 mb-0.5">🐠 Penjelasan Ramah Anak:</label>
+            <input id="texp_${qIdx}" type="text" value="${q.explanation.replace(/"/g, "&quot;")}" class="w-full px-3 py-1.5 rounded-xl border-2 border-amber-200 bg-amber-50/70 text-xs font-bold text-slate-700" />
+          </div>
+        `;
+        list.appendChild(card);
+      });
+    }
+
+    /*************************************************************************
+     * 11. EVENT LISTENERS UI & STARTUP WINDOW ONLOAD
+     *************************************************************************/
+    function bindAllEvents() {
+      // Aktivasi kamera manual
+      document.getElementById("startCamToggleBtn").addEventListener("click", toggleCameraGesture);
+      document.getElementById("hudCamBtn").addEventListener("click", toggleCameraGesture);
+
+      // Audio Mute / Unmute
+      document.getElementById("hudMuteBtn").addEventListener("click", () => {
+        const muted = oceanAudio.toggleMute();
+        document.getElementById("hudMuteIcon").textContent = muted ? "🔇" : "🔊";
+      });
+
+      // Kembali ke Peta Misi
+      document.getElementById("hudMapBtn").addEventListener("click", returnToStartScreen);
+
+      // Tombol Mulai Petualangan!
+      document.getElementById("startAdventureBtn").addEventListener("click", () => {
+        const nextIdx = Math.min(progress.unlockedMission - 1, 4);
+        startMission(nextIdx);
+      });
+
+      // Reset Progres
+      document.getElementById("resetProgressBtn").addEventListener("click", () => {
+        progress = {
+          playerName: document.getElementById("studentNameInput").value.trim(),
+          unlockedMission: 1,
+          missionScores: [0, 0, 0, 0, 0]
+        };
+        saveOceanProgress();
+        renderStartScreen();
+        showToast("Progres misi & skor telah diatur ulang ke Misi 1.", "info");
+      });
+
+      // Modal Feedback
+      document.getElementById("fbContinueBtn").addEventListener("click", continueAfterFeedback);
+
+      // Modal Misi Gagal
+      document.getElementById("failToMapBtn").addEventListener("click", returnToStartScreen);
+      document.getElementById("retryMissionBtn").addEventListener("click", () => {
+        document.getElementById("missionFailModal").classList.add("hidden");
+        startMission(state.missionIdx);
+      });
+
+      // Modal Misi Selesai
+      document.getElementById("clearToMapBtn").addEventListener("click", returnToStartScreen);
+      document.getElementById("nextMissionBtn").addEventListener("click", () => {
+        document.getElementById("missionClearModal").classList.add("hidden");
+        startMission(state.missionIdx + 1);
+      });
+
+      // Halaman Hasil Akhir
+      document.getElementById("playAgainAllBtn").addEventListener("click", () => {
+        progress.missionScores = [0, 0, 0, 0, 0];
+        saveOceanProgress();
+        startMission(0);
+      });
+      document.getElementById("victoryToMapBtn").addEventListener("click", returnToStartScreen);
+
+      // Mode Guru
+      document.getElementById("openTeacherBtn").addEventListener("click", openTeacherEditor);
+      document.getElementById("closeTeacherBtn").addEventListener("click", () => {
+        document.getElementById("teacherModal").classList.add("hidden");
+      });
+      document.getElementById("tCancelBtn").addEventListener("click", () => {
+        document.getElementById("teacherModal").classList.add("hidden");
+      });
+      document.getElementById("tSaveBtn").addEventListener("click", () => {
+        syncCurrentMissionDraft();
+        draftData.meta.mataPelajaran =
+          document.getElementById("tMapelInput").value.trim() || DEFAULT_OCEAN_DATA.meta.mataPelajaran;
+        draftData.meta.materi =
+          document.getElementById("tMateriInput").value.trim() || DEFAULT_OCEAN_DATA.meta.materi;
+        draftData.meta.kelas =
+          document.getElementById("tKelasInput").value.trim() || DEFAULT_OCEAN_DATA.meta.kelas;
+
+        oceanData = JSON.parse(JSON.stringify(draftData));
+        saveOceanData();
+        renderStartScreen();
+        document.getElementById("teacherModal").classList.add("hidden");
+        showToast("Identitas & 15 soal berhasil disimpan!", "success");
+      });
+      document.getElementById("tResetDefaultBtn").addEventListener("click", () => {
+        oceanData = JSON.parse(JSON.stringify(DEFAULT_OCEAN_DATA));
+        saveOceanData();
+        draftData = JSON.parse(JSON.stringify(oceanData));
+        document.getElementById("tMapelInput").value = draftData.meta.mataPelajaran;
+        document.getElementById("tMateriInput").value = draftData.meta.materi;
+        document.getElementById("tKelasInput").value = draftData.meta.kelas;
+        renderTeacherTabs();
+        renderTeacherQuestions();
+        renderStartScreen();
+        showToast("Soal & identitas berhasil dikembalikan ke default.", "info");
+      });
+    }
+
+    window.onload = function () {
+      resizeCanvas();
+      initUnderwaterWorld();
+      bindAllEvents();
+      renderStartScreen();
+      requestAnimationFrame(mainLoop);
+    };
+  </script>
+</body>
+</html>
